@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "lib": ["ES2021"],
+    "module": "ESNext",
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "bundler",
+    "useDefineForClassFields": true,
+    "allowImportingTsExtensions": true,
+    "composite": true,
+    "types": ["vitest/globals", "./src/typings.d.ts"]
+  },
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../shared"
+    },
+    {
+      "path": "../android"
+    },
+    {
+      "path": "../web-integration"
+    }
+  ]
+}

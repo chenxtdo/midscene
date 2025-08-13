@@ -218,6 +218,8 @@ export class Executor {
       sdkVersion: getVersion(),
       model_name: getAIConfig(MIDSCENE_MODEL_NAME) || '',
       model_description: modelDescription,
+      //@ts-ignore
+      vitest_it_name: globalThis.vitest_it_name,
       logTime: Date.now(),
       name: this.name,
       tasks: this.tasks,

@@ -182,6 +182,7 @@ export interface DumpMeta {
   logTime: number;
   model_name: string;
   model_description?: string;
+  vitest_it_name?: string;
 }
 
 export interface ReportDumpWithAttributes {
