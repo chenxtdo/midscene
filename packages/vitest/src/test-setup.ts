@@ -63,14 +63,13 @@ function setupInterceptors() {
     // 拦截 it 方法
     const wrappedIt = function (name: string | Function, fn?: unknown, options?: unknown) {
         log(`🧪 开始定义测试用例: ${String(name)}`);
-        globalThis.vitest_it_name = String(name);
         // 如果第二个参数是函数，则包装它
         let wrappedFn = fn;
         if (typeof fn === 'function') {
             wrappedFn = async () => {
                 const startTime = Date.now();
                 log(`🏃 进入测试用例执行: ${String(name)}`);
-
+                globalThis.vitest_it_name = String(name);
                 try {
                     await fn();
                     const endTime = Date.now();

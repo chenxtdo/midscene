@@ -33,7 +33,6 @@ const reportInitializedMap = new Map<string, boolean>();
 declare const __DEV_REPORT_PATH__: string;
 
 function getReportTpl() {
-  console.log('__DEV_REPORT_PATH__', __DEV_REPORT_PATH__);
   if (__DEV_REPORT_PATH__) {
     return fs.readFileSync(__DEV_REPORT_PATH__, 'utf-8');
   }

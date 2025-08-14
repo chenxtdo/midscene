@@ -16,6 +16,8 @@ export function emitInsightDump(
     sdkVersion: getVersion(),
     logTime: Date.now(),
     model_name: getAIConfig(MIDSCENE_MODEL_NAME) || '',
+    //@ts-ignore
+    vitest_it_name: globalThis.vitest_it_name,
   };
   const finalData: InsightDump = {
     logId: uuid(),
