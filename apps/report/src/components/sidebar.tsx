@@ -314,7 +314,7 @@ const Sidebar = (props: SidebarProps = {}): JSX.Element => {
           </>
         )}
       </div>
-      <Collapse items={items} />
+      <Collapse style={{ overflowY: 'auto' }} items={items} />
     </div>
   ) : null;
 
