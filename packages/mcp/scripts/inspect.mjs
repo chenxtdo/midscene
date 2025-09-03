@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { allConfigFromEnv } from '@midscene/web/bridge-mode';
+import { ALL_ENV_KEYS } from '@midscene/shared/env';
 import dotenv from 'dotenv';
 
 // Get the directory name in ES module scope
@@ -29,9 +29,7 @@ if (configResult.error) {
 
 // Prepare the command and arguments
 const command = 'npx';
-const keys = Object.keys(allConfigFromEnv()).concat([
-  'MCP_SERVER_REQUEST_TIMEOUT',
-]);
+const keys = [...ALL_ENV_KEYS, ...['MCP_SERVER_REQUEST_TIMEOUT']];
 
 const envOverrides = {};
 for (const key of keys) {
@@ -44,7 +42,7 @@ console.log(envOverrides);
 const args = [
   'mcp-inspector',
   'node',
-  path.resolve(__dirname, '..', 'dist', 'index.cjs'), // Use resolved path for robustness
+  path.resolve(__dirname, '..', 'dist', 'index.js'), // Use resolved path for robustness
   ...Object.entries(envOverrides).map(([key, value]) => `-e ${key}=${value}`),
 ];
 

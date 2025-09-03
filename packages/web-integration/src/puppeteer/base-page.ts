@@ -1,14 +1,18 @@
+import { WebPageContextParser } from '@/web-element';
 import type {
   DeviceAction,
   ElementTreeNode,
   Point,
   Size,
+  UIContext,
 } from '@midscene/core';
+import type { AbstractInterface } from '@midscene/core/device';
 import { sleep } from '@midscene/core/utils';
 import { DEFAULT_WAIT_FOR_NAVIGATION_TIMEOUT } from '@midscene/shared/constants';
 import type { ElementInfo } from '@midscene/shared/extractor';
 import { treeToList } from '@midscene/shared/extractor';
-import { getDebug } from '@midscene/shared/logger';
+import { createImgBase64ByFormat } from '@midscene/shared/img';
+import { type DebugFunction, getDebug } from '@midscene/shared/logger';
 import {
   getElementInfosScriptContent,
   getExtraReturnLogic,
@@ -16,25 +20,27 @@ import {
 import { assert } from '@midscene/shared/utils';
 import type { Page as PlaywrightPage } from 'playwright';
 import type { Page as PuppeteerPage } from 'puppeteer';
-import type { WebKeyInput } from '../common/page';
-import { type AbstractPage, commonWebActions } from '../page';
-import type { MouseButton } from '../page';
+import {
+  type KeyInput,
+  type MouseButton,
+  commonWebActionsForWebPage,
+} from '../web-page';
 
 export const debugPage = getDebug('web:page');
 
 export class Page<
   AgentType extends 'puppeteer' | 'playwright',
-  PageType extends PuppeteerPage | PlaywrightPage,
-> implements AbstractPage
+  InterfaceType extends PuppeteerPage | PlaywrightPage,
+> implements AbstractInterface
 {
-  underlyingPage: PageType;
+  underlyingPage: InterfaceType;
   protected waitForNavigationTimeout: number;
   private viewportSize?: Size;
 
-  pageType: AgentType;
+  interfaceType: AgentType;
 
   actionSpace(): DeviceAction[] {
-    return commonWebActions;
+    return commonWebActionsForWebPage(this);
   }
 
   private async evaluate<R>(
@@ -43,7 +49,7 @@ export class Page<
   ): Promise<R> {
     let result: R;
     debugPage('evaluate function begin');
-    if (this.pageType === 'puppeteer') {
+    if (this.interfaceType === 'puppeteer') {
       result = await (this.underlyingPage as PuppeteerPage).evaluate(
         pageFunction,
         arg,
@@ -59,14 +65,14 @@ export class Page<
   }
 
   constructor(
-    underlyingPage: PageType,
-    pageType: AgentType,
+    underlyingPage: InterfaceType,
+    interfaceType: AgentType,
     opts?: {
       waitForNavigationTimeout?: number;
     },
   ) {
     this.underlyingPage = underlyingPage;
-    this.pageType = pageType;
+    this.interfaceType = interfaceType;
     this.waitForNavigationTimeout =
       opts?.waitForNavigationTimeout ?? DEFAULT_WAIT_FOR_NAVIGATION_TIMEOUT;
   }
@@ -82,7 +88,10 @@ export class Page<
     }
 
     // issue: https://github.com/puppeteer/puppeteer/issues/3323
-    if (this.pageType === 'puppeteer' || this.pageType === 'playwright') {
+    if (
+      this.interfaceType === 'puppeteer' ||
+      this.interfaceType === 'playwright'
+    ) {
       debugPage('waitForNavigation begin');
       debugPage(`waitForNavigation timeout: ${this.waitForNavigationTimeout}`);
       try {
@@ -170,20 +179,20 @@ export class Page<
     debugPage('screenshotBase64 begin');
 
     let base64: string;
-    if (this.pageType === 'puppeteer') {
+    if (this.interfaceType === 'puppeteer') {
       const result = await (this.underlyingPage as PuppeteerPage).screenshot({
         type: imgType,
         quality,
         encoding: 'base64',
       });
-      base64 = `data:image/jpeg;base64,${result}`;
-    } else if (this.pageType === 'playwright') {
+      base64 = createImgBase64ByFormat(imgType, result);
+    } else if (this.interfaceType === 'playwright') {
       const buffer = await (this.underlyingPage as PlaywrightPage).screenshot({
         type: imgType,
         quality,
         timeout: 10 * 1000,
       });
-      base64 = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+      base64 = createImgBase64ByFormat(imgType, buffer.toString('base64'));
     } else {
       throw new Error('Unsupported page type for screenshot');
     }
@@ -194,6 +203,11 @@ export class Page<
 
   async url(): Promise<string> {
     return this.underlyingPage.url();
+  }
+
+  describe(): string {
+    const url = this.underlyingPage.url();
+    return url || '';
   }
 
   get mouse() {
@@ -212,12 +226,12 @@ export class Page<
       },
       wheel: async (deltaX: number, deltaY: number) => {
         debugPage(`mouse wheel ${deltaX}, ${deltaY}`);
-        if (this.pageType === 'puppeteer') {
+        if (this.interfaceType === 'puppeteer') {
           await (this.underlyingPage as PuppeteerPage).mouse.wheel({
             deltaX,
             deltaY,
           });
-        } else if (this.pageType === 'playwright') {
+        } else if (this.interfaceType === 'playwright') {
           await (this.underlyingPage as PlaywrightPage).mouse.wheel(
             deltaX,
             deltaY,
@@ -233,28 +247,23 @@ export class Page<
         from: { x: number; y: number },
         to: { x: number; y: number },
       ) => {
-        debugPage(`mouse drag from ${from.x}, ${from.y} to ${to.x}, ${to.y}`);
-        if (this.pageType === 'puppeteer') {
-          await (this.underlyingPage as PuppeteerPage).mouse.drag(
-            {
-              x: from.x,
-              y: from.y,
-            },
-            {
-              x: to.x,
-              y: to.y,
-            },
-          );
-        } else if (this.pageType === 'playwright') {
-          // Playwright doesn't have a drag method, so we need to simulate it
-          await (this.underlyingPage as PlaywrightPage).mouse.move(
-            from.x,
-            from.y,
-          );
-          await (this.underlyingPage as PlaywrightPage).mouse.down();
-          await (this.underlyingPage as PlaywrightPage).mouse.move(to.x, to.y);
-          await (this.underlyingPage as PlaywrightPage).mouse.up();
-        }
+        debugPage(
+          `begin mouse drag from ${from.x}, ${from.y} to ${to.x}, ${to.y}`,
+        );
+        await (this.underlyingPage as PlaywrightPage).mouse.move(
+          from.x,
+          from.y,
+        );
+        await sleep(200);
+        await (this.underlyingPage as PlaywrightPage).mouse.down();
+        await sleep(300);
+        await (this.underlyingPage as PlaywrightPage).mouse.move(to.x, to.y);
+        await sleep(500);
+        await (this.underlyingPage as PlaywrightPage).mouse.up();
+        await sleep(200);
+        debugPage(
+          `end mouse drag from ${from.x}, ${from.y} to ${to.x}, ${to.y}`,
+        );
       },
     };
   }
@@ -267,8 +276,8 @@ export class Page<
       },
       press: async (
         action:
-          | { key: WebKeyInput; command?: string }
-          | { key: WebKeyInput; command?: string }[],
+          | { key: KeyInput; command?: string }
+          | { key: KeyInput; command?: string }[],
       ) => {
         const keys = Array.isArray(action) ? action : [action];
         debugPage('keyboard press', keys);
@@ -280,11 +289,11 @@ export class Page<
           await this.underlyingPage.keyboard.up(k.key);
         }
       },
-      down: async (key: WebKeyInput) => {
+      down: async (key: KeyInput) => {
         debugPage(`keyboard down ${key}`);
         this.underlyingPage.keyboard.down(key);
       },
-      up: async (key: WebKeyInput) => {
+      up: async (key: KeyInput) => {
         debugPage(`keyboard up ${key}`);
         this.underlyingPage.keyboard.up(key);
       },
@@ -305,7 +314,7 @@ export class Page<
     const isMac = process.platform === 'darwin';
     debugPage('clearInput begin');
     if (isMac) {
-      if (this.pageType === 'puppeteer') {
+      if (this.interfaceType === 'puppeteer') {
         // https://github.com/segment-boneyard/nightmare/issues/810#issuecomment-452669866
         await this.mouse.click(element.center[0], element.center[1], {
           count: 3,
@@ -391,14 +400,55 @@ export class Page<
 
   async navigate(url: string): Promise<void> {
     debugPage(`navigate to ${url}`);
-    if (this.pageType === 'puppeteer') {
+    if (this.interfaceType === 'puppeteer') {
       await (this.underlyingPage as PuppeteerPage).goto(url);
-    } else if (this.pageType === 'playwright') {
+    } else if (this.interfaceType === 'playwright') {
       await (this.underlyingPage as PlaywrightPage).goto(url);
     } else {
       throw new Error('Unsupported page type for navigate');
     }
   }
 
+  async beforeAction(): Promise<void> {
+    await this.waitForNavigation();
+  }
+
   async destroy(): Promise<void> {}
+
+  async getContext(): Promise<UIContext> {
+    return await WebPageContextParser(this, {});
+  }
+}
+
+export function forceClosePopup(
+  page: PuppeteerPage | PlaywrightPage,
+  debugProfile: DebugFunction,
+) {
+  page.on('popup', async (popup) => {
+    if (!popup) {
+      console.warn('got a popup event, but the popup is not ready yet, skip');
+      return;
+    }
+    const url = await (popup as PuppeteerPage).url();
+    console.log(`Popup opened: ${url}`);
+    if (!(popup as PuppeteerPage).isClosed()) {
+      try {
+        await (popup as PuppeteerPage).close(); // Close the newly opened TAB
+      } catch (error) {
+        debugProfile(`failed to close popup ${url}, error: ${error}`);
+      }
+    } else {
+      debugProfile(`popup is already closed, skip close ${url}`);
+    }
+
+    if (!page.isClosed()) {
+      try {
+        await page.goto(url);
+      } catch (error) {
+        debugProfile(`failed to goto ${url}, error: ${error}`);
+      }
+    } else {
+      debugProfile(`page is already closed, skip goto ${url}`);
+    }
+  });
 }

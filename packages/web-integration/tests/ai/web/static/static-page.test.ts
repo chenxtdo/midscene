@@ -1,10 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { StaticPageAgent } from '@/playground/agent';
-import PlaygroundServer from '@/playground/server';
-import StaticPage from '@/playground/static-page';
-import { allConfigFromEnv } from '@midscene/shared/env';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { StaticPageAgent, PlaygroundServer, StaticPage } from '@midscene/playground';
+import { afterEach, describe, expect, it } from 'vitest';
 
 const dumpFilePath = join(__dirname, '../../fixtures/ui-context.json');
 const context = readFileSync(dumpFilePath, { encoding: 'utf-8' });
@@ -12,6 +9,9 @@ const contextJson = JSON.parse(context);
 
 describe(
   'static page agent',
+  {
+    timeout: 30 * 1000,
+  },
   () => {
     let server: PlaygroundServer | null = null;
     
@@ -34,17 +34,8 @@ describe(
     });
 
     it('server should work', async () => {
-      // Save current config before creating server
-      const currentConfig = (globalThis as any).midsceneGlobalConfig;
-      
       server = new PlaygroundServer(StaticPage, StaticPageAgent);
-      
-      // Restore config after server creation in case it was cleared
-      if (!(globalThis as any).midsceneGlobalConfig || 
-          Object.keys((globalThis as any).midsceneGlobalConfig || {}).length === 0) {
-        (globalThis as any).midsceneGlobalConfig = currentConfig || allConfigFromEnv();
-      }
-      
+
       await server.launch();
 
       const port = server.port;
@@ -69,7 +60,5 @@ describe(
       expect(data.error).toBeFalsy();
     });
   },
-  {
-    timeout: 30 * 1000,
-  },
+
 );

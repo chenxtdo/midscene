@@ -1,6 +1,7 @@
-import { PageAgent, type PageAgentOpt } from '@/common/agent';
-import type { KeyboardAction, MouseAction } from '@/page';
+import { Agent, type AgentOpt } from '@midscene/core/agent';
 import { assert } from '@midscene/shared/utils';
+import { commonWebActionsForWebPage } from '../web-page';
+import type { KeyboardAction, MouseAction } from '../web-page';
 import {
   type BridgeConnectTabOptions,
   BridgeEvent,
@@ -44,24 +45,28 @@ export const getBridgePageInCliSide = (
     },
   };
 
-  return new Proxy(page, {
+  const proxyPage = new Proxy(page, {
     get(target, prop, receiver) {
       assert(typeof prop === 'string', 'prop must be a string');
 
       if (prop === 'toJSON') {
         return () => {
           return {
-            pageType: BridgePageType,
+            interfaceType: BridgePageType,
           };
         };
       }
 
-      if (prop === 'pageType') {
+      if (prop === 'getContext') {
+        return undefined;
+      }
+
+      if (prop === 'interfaceType') {
         return BridgePageType;
       }
 
-      if (prop === '_forceUsePageContext') {
-        return undefined;
+      if (prop === 'actionSpace') {
+        return () => commonWebActionsForWebPage(proxyPage);
       }
 
       if (Object.keys(page).includes(prop)) {
@@ -101,13 +106,15 @@ export const getBridgePageInCliSide = (
       return bridgeCaller(prop);
     },
   }) as ChromeExtensionPageCliSide;
+
+  return proxyPage;
 };
 
-export class AgentOverChromeBridge extends PageAgent<ChromeExtensionPageCliSide> {
+export class AgentOverChromeBridge extends Agent<ChromeExtensionPageCliSide> {
   private destroyAfterDisconnectFlag?: boolean;
 
   constructor(
-    opts?: PageAgentOpt & {
+    opts?: AgentOpt & {
       closeNewTabsAfterDisconnect?: boolean;
       serverListeningTimeout?: number | false;
       closeConflictServer?: boolean;

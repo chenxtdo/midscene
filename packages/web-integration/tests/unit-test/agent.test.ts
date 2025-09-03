@@ -1,22 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { PageAgent } from '@/common/agent';
-import type { WebPage } from '@/common/page';
-import { buildPlans } from '@/common/plan-builder';
+import type { AbstractWebPage } from '@/web-page';
 import type { GroupedActionDump } from '@midscene/core';
+import { Agent as PageAgent } from '@midscene/core/agent';
+import { globalConfigManager } from '@midscene/shared/env';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock the buildPlans function
-vi.mock('@/common/plan-builder', () => ({
-  buildPlans: vi.fn(),
-}));
-
+declare const __VERSION__: string;
 // Mock only the necessary parts to avoid side effects
 vi.mock('@midscene/core/utils', () => ({
   writeLogFile: vi.fn(() => null),
   reportHTMLContent: vi.fn(() => ''),
   stringifyDumpData: vi.fn(() => '{}'),
   groupedActionDumpFileExt: '.json',
+  getVersion: () => __VERSION__,
+  sleep: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('@midscene/shared/logger', () => ({
@@ -37,7 +35,7 @@ vi.mock('@/common/utils', async () => {
   const actual = await vi.importActual('@/common/utils');
   return {
     ...actual,
-    parseContextFromWebPage: vi.fn().mockResolvedValue({}),
+    WebPageContextParser: vi.fn().mockResolvedValue({}),
     trimContextByViewport: vi.fn((execution) => execution),
     printReportMsg: vi.fn(),
   };
@@ -45,7 +43,7 @@ vi.mock('@/common/utils', async () => {
 
 // Mock page implementation
 const mockPage = {
-  pageType: 'puppeteer',
+  interfaceType: 'puppeteer',
   mouse: {
     click: vi.fn(),
   },
@@ -53,7 +51,13 @@ const mockPage = {
   evaluateJavaScript: vi.fn(),
   size: vi.fn().mockResolvedValue({ dpr: 1 }),
   destroy: vi.fn(),
-} as unknown as WebPage;
+} as unknown as AbstractWebPage;
+
+const mockModelConfig = {
+  MIDSCENE_MODEL_NAME: 'mock-model',
+  MIDSCENE_OPENAI_API_KEY: 'mock-api-key',
+  MIDSCENE_OPENAI_BASE_URL: 'mock-base-url',
+};
 
 // Mock task executor
 const mockTaskExecutor = {
@@ -66,59 +70,16 @@ describe('PageAgent RightClick', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    globalConfigManager.reset();
     // Create agent instance
     agent = new PageAgent(mockPage, {
       generateReport: false,
       autoPrintReportMsg: false,
+      modelConfig: () => mockModelConfig,
     });
 
     // Replace the taskExecutor with our mock
     agent.taskExecutor = mockTaskExecutor;
-  });
-
-  it('should build correct plans for aiRightClick', async () => {
-    const mockPlans = [
-      {
-        type: 'Locate' as const,
-        locate: { prompt: 'context menu trigger' },
-        param: { prompt: 'context menu trigger' },
-        thought: '',
-      },
-      {
-        type: 'RightClick' as const,
-        locate: { prompt: 'context menu trigger' },
-        param: null,
-        thought: '',
-      },
-    ];
-
-    const mockExecutorResult = {
-      executor: {
-        dump: () => ({ name: 'test', tasks: [] }),
-        isInErrorState: () => false,
-      },
-      output: {},
-    };
-
-    vi.mocked(buildPlans).mockReturnValue(mockPlans);
-    mockTaskExecutor.runPlans.mockResolvedValue(mockExecutorResult);
-
-    // Call aiRightClick
-    await agent.aiRightClick('context menu trigger');
-
-    // Verify buildPlans was called with correct parameters
-    expect(buildPlans).toHaveBeenCalledWith('RightClick', {
-      prompt: 'context menu trigger',
-    });
-
-    // Verify runPlans was called with correct parameters
-    expect(mockTaskExecutor.runPlans).toHaveBeenCalledWith(
-      'RightClick - context menu trigger',
-      mockPlans,
-      {
-        cacheable: undefined,
-      },
-    );
   });
 
   it('should handle aiRightClick with locate options', async () => {
@@ -157,7 +118,6 @@ describe('PageAgent RightClick', () => {
       output: {},
     };
 
-    vi.mocked(buildPlans).mockReturnValue(mockPlans);
     mockTaskExecutor.runPlans.mockResolvedValue(mockExecutorResult);
 
     // Call aiRightClick with options
@@ -165,49 +125,10 @@ describe('PageAgent RightClick', () => {
       deepThink: true,
       cacheable: false,
     });
-
-    // Verify buildPlans was called with correct parameters including options
-    expect(buildPlans).toHaveBeenCalledWith('RightClick', {
-      prompt: 'right click target',
-      deepThink: true,
-      cacheable: false,
-    });
   });
 
   it('should be supported in ai method with rightClick type', async () => {
-    const mockPlans = [
-      {
-        type: 'Locate' as const,
-        locate: { prompt: 'button to right click' },
-        param: { prompt: 'button to right click' },
-        thought: '',
-      },
-      {
-        type: 'RightClick' as const,
-        locate: { prompt: 'button to right click' },
-        param: null,
-        thought: '',
-      },
-    ];
-
-    const mockExecutorResult = {
-      executor: {
-        dump: () => ({ name: 'test', tasks: [] }),
-        isInErrorState: () => false,
-      },
-      output: {},
-    };
-
-    vi.mocked(buildPlans).mockReturnValue(mockPlans);
-    mockTaskExecutor.runPlans.mockResolvedValue(mockExecutorResult);
-
-    // Call ai method with rightClick type
     await agent.ai('button to right click', 'rightClick');
-
-    // Verify buildPlans was called with RightClick
-    expect(buildPlans).toHaveBeenCalledWith('RightClick', {
-      prompt: 'button to right click',
-    });
   });
 
   it('should throw error for invalid ai method type', async () => {
@@ -221,7 +142,10 @@ describe('PageAgent logContent', () => {
   let agent: PageAgent;
 
   beforeEach(() => {
-    agent = new PageAgent(mockPage);
+    globalConfigManager.reset();
+    agent = new PageAgent(mockPage, {
+      modelConfig: () => mockModelConfig,
+    });
     const dumpPath = path.join(__dirname, 'fixtures', 'dump.json');
     agent.dump = JSON.parse(
       fs.readFileSync(dumpPath, 'utf-8'),
@@ -229,13 +153,13 @@ describe('PageAgent logContent', () => {
   });
 
   it('should return correct content', async () => {
-    expect(agent.dump.executions[0].tasks[0].pageContext).toBeDefined();
+    expect(agent.dump.executions[0].tasks[0].uiContext).toBeDefined();
     expect(agent.dump.executions[0].tasks[0].log).toBeDefined();
     const content = agent._unstableLogContent() as GroupedActionDump;
     expect(content).matchSnapshot();
-    expect(content.executions[0].tasks[0].pageContext).toBeUndefined();
+    expect(content.executions[0].tasks[0].uiContext).toBeUndefined();
     expect(content.executions[0].tasks[0].log).toBeUndefined();
-    expect(agent.dump.executions[0].tasks[0].pageContext).toBeDefined();
+    expect(agent.dump.executions[0].tasks[0].uiContext).toBeDefined();
     expect(agent.dump.executions[0].tasks[0].log).toBeDefined();
   });
 });
@@ -243,19 +167,23 @@ describe('PageAgent logContent', () => {
 describe('PageAgent reportFileName', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    globalConfigManager.reset();
   });
 
   it('should use external reportFileName when provided', () => {
     const customReportName = 'my-custom-report-name';
     const agent = new PageAgent(mockPage, {
       reportFileName: customReportName,
+      modelConfig: () => mockModelConfig,
     });
 
     expect(agent.reportFileName).toBe(customReportName);
   });
 
   it('should generate reportFileName when not provided', () => {
-    const agent = new PageAgent(mockPage);
+    const agent = new PageAgent(mockPage, {
+      modelConfig: () => mockModelConfig,
+    });
 
     // The generated name should contain puppeteer and follow the pattern
     // Note: uuid() generates base-36 strings (0-9, a-z)
@@ -267,6 +195,7 @@ describe('PageAgent reportFileName', () => {
   it('should use testId for generated reportFileName when provided', () => {
     const agent = new PageAgent(mockPage, {
       testId: 'test-123',
+      modelConfig: () => mockModelConfig,
     });
 
     // The generated name should contain test-123 and follow the pattern
@@ -281,23 +210,171 @@ describe('PageAgent reportFileName', () => {
     const agent = new PageAgent(mockPage, {
       reportFileName: customReportName,
       testId: 'test-456',
+      modelConfig: () => mockModelConfig,
     });
 
     expect(agent.reportFileName).toBe(customReportName);
   });
 
-  it('should fallback to "web" when pageType is not available', () => {
+  it('should fallback to "web" when interfaceType is not available', () => {
     const mockPageWithoutType = {
       ...mockPage,
-      pageType: undefined,
-    } as unknown as WebPage;
+      interfaceType: undefined,
+    } as unknown as AbstractWebPage;
 
-    const agent = new PageAgent(mockPageWithoutType);
+    const agent = new PageAgent(mockPageWithoutType, {
+      modelConfig: () => mockModelConfig,
+    });
 
     // The generated name should contain web and follow the pattern
     // Note: uuid() generates base-36 strings (0-9, a-z)
     expect(agent.reportFileName).toMatch(
       /web-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-[a-z0-9]{8}/,
+    );
+  });
+});
+
+describe('PageAgent aiWaitFor with doNotThrowError', () => {
+  let agent: PageAgent;
+  let mockTaskExecutor: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    globalConfigManager.reset();
+    // Create agent instance
+    agent = new PageAgent(mockPage, {
+      generateReport: false,
+      autoPrintReportMsg: false,
+      modelConfig: () => mockModelConfig,
+    });
+
+    // Mock the task executor with waitFor method
+    mockTaskExecutor = {
+      waitFor: vi.fn(),
+    };
+
+    // Replace the taskExecutor with our mock
+    agent.taskExecutor = mockTaskExecutor;
+  });
+
+  it('should call waitFor with doNotThrowError option in createTypeQueryTask', async () => {
+    // Mock the waitFor method to return a successful executor
+    const mockExecutorResult = {
+      executor: {
+        dump: () => ({ name: 'waitFor test', tasks: [] }),
+        isInErrorState: () => false,
+        latestErrorTask: () => null,
+      },
+    };
+
+    mockTaskExecutor.waitFor.mockResolvedValue(mockExecutorResult);
+
+    // Call aiWaitFor
+    await agent.aiWaitFor('test assertion', {
+      timeoutMs: 5000,
+      checkIntervalMs: 1000,
+    });
+
+    // Verify that waitFor was called with the correct parameters
+    expect(mockTaskExecutor.waitFor).toHaveBeenCalledWith('test assertion', {
+      timeoutMs: 5000,
+      checkIntervalMs: 1000,
+    });
+  });
+
+  it('should handle executor error state and still generate report', async () => {
+    // Mock the waitFor method to return an executor in error state
+    const mockExecutorResult = {
+      executor: {
+        dump: () => ({ name: 'waitFor test', tasks: [] }),
+        isInErrorState: () => true,
+        latestErrorTask: () => ({
+          error: 'Test error message',
+          errorStack: 'Test error stack',
+        }),
+      },
+    };
+
+    mockTaskExecutor.waitFor.mockResolvedValue(mockExecutorResult);
+
+    // Call aiWaitFor and expect it to throw after generating report
+    await expect(agent.aiWaitFor('test assertion')).rejects.toThrow(
+      'Test error message\nTest error stack',
+    );
+
+    // Verify that waitFor was called
+    expect(mockTaskExecutor.waitFor).toHaveBeenCalled();
+  });
+
+  it('should use default timeout and checkInterval values', async () => {
+    const mockExecutorResult = {
+      executor: {
+        dump: () => ({ name: 'waitFor test', tasks: [] }),
+        isInErrorState: () => false,
+        latestErrorTask: () => null,
+      },
+    };
+
+    mockTaskExecutor.waitFor.mockResolvedValue(mockExecutorResult);
+
+    // Call aiWaitFor without options
+    await agent.aiWaitFor('test assertion');
+
+    // Verify that waitFor was called with default values
+    expect(mockTaskExecutor.waitFor).toHaveBeenCalledWith('test assertion', {
+      timeoutMs: 15000, // 15 * 1000
+      checkIntervalMs: 3000, // 3 * 1000
+    });
+  });
+
+  it('should pass through custom timeout and checkInterval values', async () => {
+    const mockExecutorResult = {
+      executor: {
+        dump: () => ({ name: 'waitFor test', tasks: [] }),
+        isInErrorState: () => false,
+        latestErrorTask: () => null,
+      },
+    };
+
+    mockTaskExecutor.waitFor.mockResolvedValue(mockExecutorResult);
+
+    const customOptions = {
+      timeoutMs: 30000,
+      checkIntervalMs: 5000,
+    };
+
+    // Call aiWaitFor with custom options
+    await agent.aiWaitFor('test assertion', customOptions);
+
+    // Verify that waitFor was called with custom values
+    expect(mockTaskExecutor.waitFor).toHaveBeenCalledWith('test assertion', {
+      timeoutMs: 30000,
+      checkIntervalMs: 5000,
+    });
+  });
+
+  it('should call afterTaskRunning with doNotThrowError=true', async () => {
+    const mockExecutorResult = {
+      executor: {
+        dump: () => ({ name: 'waitFor test', tasks: [] }),
+        isInErrorState: () => false,
+        latestErrorTask: () => null,
+      },
+    };
+
+    mockTaskExecutor.waitFor.mockResolvedValue(mockExecutorResult);
+
+    // Spy on afterTaskRunning method
+    const afterTaskRunningSpy = vi.spyOn(agent as any, 'afterTaskRunning');
+
+    // Call aiWaitFor
+    await agent.aiWaitFor('test assertion');
+
+    // Verify that afterTaskRunning was called with doNotThrowError=true
+    expect(afterTaskRunningSpy).toHaveBeenCalledWith(
+      mockExecutorResult.executor,
+      true,
     );
   });
 });

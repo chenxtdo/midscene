@@ -121,7 +121,7 @@ There are so many UI automation tools out there, and each one seems to be all-po
 
 We would like to thank the following projects:
 
-- [Rsbuild](https://github.com/web-infra-dev/rsbuild) for the build tool.
+- [Rsbuild](https://github.com/web-infra-dev/rsbuild) and [Rslib](https://github.com/web-infra-dev/rslib) for the build tool.
 - [UI-TARS](https://github.com/bytedance/ui-tars) for the open-source agent model UI-TARS.
 - [Qwen2.5-VL](https://github.com/QwenLM/Qwen2.5-VL) for the open-source VL model Qwen2.5-VL.
 - [scrcpy](https://github.com/Genymobile/scrcpy) and [yume-chan](https://github.com/yume-chan) allow us to control Android devices with browser.
@@ -143,6 +143,10 @@ If you use Midscene.js in your research or project, please cite:
   url = {https://github.com/web-infra-dev/midscene}
 }
 ```
+
+## ✨ Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=web-infra-dev/midscene&type=Date)](https://www.star-history.com/#web-infra-dev/midscene&Date)
 
 
 ## 📝 License

@@ -1,7 +1,5 @@
-import type { GroupedActionDump, UIContext } from '@midscene/core';
-import type { WebUIContext } from '@midscene/web';
-import type { ChromeExtensionProxyPageAgent } from '@midscene/web/chrome-extension';
-import type { StaticPageAgent } from '@midscene/web/playground';
+import type { GroupedActionDump, WebUIContext } from '@midscene/core';
+import type { PlaygroundAgent } from '@midscene/playground';
 
 // result type
 export interface PlaygroundResult {
@@ -13,9 +11,7 @@ export interface PlaygroundResult {
 
 // Playground component props type
 export interface PlaygroundProps {
-  getAgent: (
-    forceSameTabNavigation?: boolean,
-  ) => StaticPageAgent | ChromeExtensionProxyPageAgent | null;
+  getAgent: (forceSameTabNavigation?: boolean) => PlaygroundAgent | null;
   hideLogo?: boolean;
   showContextPreview?: boolean;
   dryMode?: boolean;
@@ -30,4 +26,20 @@ export interface StaticPlaygroundProps {
 export type ServiceModeType = 'Server' | 'In-Browser' | 'In-Browser-Extension';
 
 // run type
-export type RunType = 'aiAction' | 'aiQuery' | 'aiAssert' | 'aiTap';
+export type RunType =
+  | 'aiAction'
+  | 'aiQuery'
+  | 'aiAssert'
+  | 'aiTap'
+  | 'aiDoubleClick'
+  | 'aiHover'
+  | 'aiInput'
+  | 'aiRightClick'
+  | 'aiKeyboardPress'
+  | 'aiScroll'
+  | 'aiLocate'
+  | 'aiBoolean'
+  | 'aiNumber'
+  | 'aiString'
+  | 'aiAsk'
+  | 'aiWaitFor';

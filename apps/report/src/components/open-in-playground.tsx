@@ -1,10 +1,6 @@
 import { PlayCircleOutlined } from '@ant-design/icons';
 import type { UIContext } from '@midscene/core';
-import {
-  Describer,
-  useEnvConfig,
-  useStaticPageAgent,
-} from '@midscene/visualizer';
+import { staticAgentFromContext, useEnvConfig } from '@midscene/visualizer';
 import type { WebUIContext } from '@midscene/web';
 import {
   Button,
@@ -73,6 +69,7 @@ export default function OpenInPlayground(props?: { context?: UIContext }) {
   const [context, setContext] = useState<UIContext | undefined>();
   const [contextLoadingCounter, setContextLoadingCounter] = useState(0);
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+  // const { syncFromStorage } = useEnvConfig();
 
   let ifPlaygroundValid = true;
   let invalidReason: React.ReactNode = '';
@@ -80,6 +77,11 @@ export default function OpenInPlayground(props?: { context?: UIContext }) {
     ifPlaygroundValid = false;
     invalidReason = errorMessageNoContext;
   }
+
+  // // Sync config from storage on component mount
+  // useEffect(() => {
+  //   syncFromStorage();
+  // }, []); // Empty dependency array - only run once on mount
 
   const showPlayground = () => {
     setContextLoadingCounter((c) => c + 1);
@@ -90,7 +92,6 @@ export default function OpenInPlayground(props?: { context?: UIContext }) {
   const handleClose = () => {
     setIsDrawerVisible(false);
   };
-  const agent = useStaticPageAgent(context as WebUIContext);
 
   const tabItems: TabsProps['items'] = [
     {
@@ -114,7 +115,7 @@ export default function OpenInPlayground(props?: { context?: UIContext }) {
     toolContent = (
       <StandardPlayground
         getAgent={() => {
-          return agent;
+          return staticAgentFromContext(context as WebUIContext);
         }}
         dryMode={true}
         hideLogo={true}
@@ -122,13 +123,7 @@ export default function OpenInPlayground(props?: { context?: UIContext }) {
       />
     );
   } else if (activeTab === tabKeys.ELEMENT_DESCRIBER) {
-    if (context) {
-      toolContent = (
-        <Describer uiContext={context} key={contextLoadingCounter} />
-      );
-    } else {
-      toolContent = <div>No context found</div>;
-    }
+    toolContent = <div>The component Describer was removed</div>;
   }
 
   const tabComponent = (

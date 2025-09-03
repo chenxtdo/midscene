@@ -1,6 +1,6 @@
 import path from 'node:path';
+import { sleep } from '@midscene/core/utils';
 import { expect } from '@playwright/test';
-import { sleep } from 'openai/core';
 import { test } from './fixture';
 
 test.beforeEach(async ({ page }) => {
@@ -27,6 +27,7 @@ test('prompting with images', async ({
         url: 'https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png',
       },
     ],
+    convertHttpImage2Base64: true,
   });
 
   expect(positiveCheck).toBe(true);

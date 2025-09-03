@@ -1,16 +1,21 @@
 import { plan } from '@/ai-model';
-import { vlLocateMode } from '@midscene/shared/env';
+import { globalConfigManager, vlLocateMode } from '@midscene/shared/env';
 import { mockActionSpace } from 'tests/common';
 import { getContextFromFixture } from 'tests/evaluation';
-/* eslint-disable max-lines-per-function */
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.setConfig({
   testTimeout: 180 * 1000,
   hookTimeout: 30 * 1000,
 });
 
-const vlMode = vlLocateMode();
+beforeAll(async () => {
+  await globalConfigManager.init();
+});
+
+const vlMode = vlLocateMode({
+  intent: 'default',
+});
 
 describe.skipIf(vlMode)('automation - llm planning', () => {
   it('basic run', async () => {
@@ -21,7 +26,7 @@ describe.skipIf(vlMode)('automation - llm planning', () => {
       {
         context,
         actionSpace: mockActionSpace,
-        pageType: 'puppeteer',
+        interfaceType: 'puppeteer',
       },
     );
     expect(actions).toBeTruthy();
@@ -38,16 +43,16 @@ describe.skipIf(vlMode)('automation - llm planning', () => {
     const { context } = await getContextFromFixture('todo');
     const { actions } = await plan(
       'Scroll down the page by 200px, scroll up the page by 100px, scroll right the second item of the task list by 300px',
-      { context, actionSpace: mockActionSpace, pageType: 'puppeteer' },
+      { context, actionSpace: mockActionSpace, interfaceType: 'puppeteer' },
     );
     expect(actions).toBeTruthy();
     expect(actions!.length).toBe(3);
     expect(actions![0].type).toBe('Scroll');
-    expect(actions![0].locate).toBeNull();
     expect(actions![0].param).toBeDefined();
+    expect(actions![0].param.locate).toBeNull();
 
-    expect(actions![2].locate).toBeTruthy();
     expect(actions![2].param).toBeDefined();
+    expect(actions![2].param.locate).toBeTruthy();
   });
 });
 
@@ -86,12 +91,15 @@ describe('planning', () => {
       const { actions } = await plan(instruction, {
         context,
         actionSpace: mockActionSpace,
-        pageType: 'puppeteer',
+        interfaceType: 'puppeteer',
       });
       expect(actions).toBeTruthy();
-      expect(actions![0].locate).toBeTruthy();
-      expect(actions![0].locate?.prompt).toBeTruthy();
-      expect(actions![0].locate?.id || actions![0].locate?.bbox).toBeTruthy();
+      // console.log(actions);
+      expect(actions![0].param.locate).toBeTruthy();
+      expect(actions![0].param.locate?.prompt).toBeTruthy();
+      expect(
+        actions![0].param.locate?.id || actions![0].param.locate?.bbox,
+      ).toBeTruthy();
     });
   });
 
@@ -102,19 +110,20 @@ describe('planning', () => {
       {
         context,
         actionSpace: mockActionSpace,
-        pageType: 'puppeteer',
+        interfaceType: 'puppeteer',
       },
     );
     expect(actions).toBeTruthy();
     expect(actions![0].type).toBe('Scroll');
-    expect(actions![0].locate).toBeTruthy();
+    expect(actions![0].param).toBeDefined();
+    expect(actions![0].param.locate).toBeTruthy();
   });
 
   it('should not throw in an "if" statement', async () => {
     const { context } = await getContextFromFixture('todo');
     const { actions, error } = await plan(
       'If there is a cookie prompt, close it',
-      { context, actionSpace: mockActionSpace, pageType: 'puppeteer' },
+      { context, actionSpace: mockActionSpace, interfaceType: 'puppeteer' },
     );
 
     expect(error).toBeFalsy();
@@ -125,7 +134,7 @@ describe('planning', () => {
     const { context } = await getContextFromFixture('todo');
     const res = await plan(
       'click the input box, wait 300ms. After that, the page will be redirected to the home page, click the close button of the cookie prompt on the home page',
-      { context, actionSpace: mockActionSpace, pageType: 'puppeteer' },
+      { context, actionSpace: mockActionSpace, interfaceType: 'puppeteer' },
     );
 
     expect(res.more_actions_needed_by_instruction).toBeTruthy();

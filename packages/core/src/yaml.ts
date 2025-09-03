@@ -1,17 +1,22 @@
-import type { PlanningActionParamScroll, Rect, TUserPrompt } from './types';
+import type { TUserPrompt } from './ai-model/common';
+import type { Rect } from './types';
 import type { BaseElement, UIContext } from './types';
 
 export interface LocateOption {
+  prompt?: TUserPrompt;
   deepThink?: boolean; // only available in vl model
   cacheable?: boolean; // user can set this param to false to disable the cache for a single agent api
   xpath?: string; // only available in web
-  pageContext?: UIContext<BaseElement>;
+  uiContext?: UIContext<BaseElement>;
 }
 
 export interface InsightExtractOption {
   domIncluded?: boolean | 'visible-only';
   screenshotIncluded?: boolean;
   returnThought?: boolean;
+  // To make the assert in the "waitfor" section display the warning icon in report
+  isWaitForAssert?: boolean;
+  doNotThrowError?: boolean;
 }
 
 export interface ReferenceImage {
@@ -24,7 +29,7 @@ export interface DetailedLocateParam extends LocateOption {
   referenceImage?: ReferenceImage;
 }
 
-export interface scrollParam {
+export interface ScrollParam {
   direction: 'down' | 'up' | 'right' | 'left';
   scrollType: 'once' | 'untilBottom' | 'untilTop' | 'untilRight' | 'untilLeft';
   distance?: null | number; // distance in px
@@ -96,6 +101,7 @@ export interface MidsceneYamlFlowItemAIAction {
 export interface MidsceneYamlFlowItemAIAssert {
   aiAssert: string;
   errorMessage?: string;
+  name?: string;
 }
 
 export interface MidsceneYamlFlowItemAIQuery extends InsightExtractOption {
@@ -141,25 +147,37 @@ export interface MidsceneYamlFlowItemAIRightClick extends LocateOption {
   aiRightClick: TUserPrompt;
 }
 
+export interface MidsceneYamlFlowItemAIDoubleClick extends LocateOption {
+  aiDoubleClick: TUserPrompt;
+}
+
 export interface MidsceneYamlFlowItemAIHover extends LocateOption {
   aiHover: TUserPrompt;
 }
 
 export interface MidsceneYamlFlowItemAIInput extends LocateOption {
-  aiInput: string; // value to input
-  locate: TUserPrompt; // where to input
+  // previous version
+  // aiInput: string; // value to input
+  // locate: TUserPrompt; // where to input
+  aiInput: TUserPrompt | undefined; // where to input
+  value: string; // value to input
 }
 
 export interface MidsceneYamlFlowItemAIKeyboardPress extends LocateOption {
-  aiKeyboardPress: string;
-  locate?: TUserPrompt; // where to press, optional
+  // previous version
+  // aiKeyboardPress: string;
+  // locate?: TUserPrompt; // where to press, optional
+  aiKeyboardPress: TUserPrompt | undefined; // where to press
+  keyName: string; // key to press
 }
 
 export interface MidsceneYamlFlowItemAIScroll
   extends LocateOption,
-    PlanningActionParamScroll {
-  aiScroll: null;
-  locate?: TUserPrompt; // which area to scroll, optional
+    ScrollParam {
+  // previous version
+  // aiScroll: null;
+  // locate?: TUserPrompt; // which area to scroll, optional
+  aiScroll: TUserPrompt | undefined; // which area to scroll
 }
 
 export interface MidsceneYamlFlowItemEvaluateJavaScript {
@@ -183,6 +201,7 @@ export type MidsceneYamlFlowItem =
   | MidsceneYamlFlowItemAIWaitFor
   | MidsceneYamlFlowItemAITap
   | MidsceneYamlFlowItemAIRightClick
+  | MidsceneYamlFlowItemAIDoubleClick
   | MidsceneYamlFlowItemAIHover
   | MidsceneYamlFlowItemAIInput
   | MidsceneYamlFlowItemAIKeyboardPress

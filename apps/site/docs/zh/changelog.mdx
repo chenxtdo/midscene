@@ -2,6 +2,57 @@
 
 > 完整更新日志请参考：[Midscene Releases](https://github.com/web-infra-dev/midscene/releases)
 
+## v0.27 - 🧠 核心模块重构，断言与报告功能全面升级
+
+### ⚠️ 核心模块重构
+
+在 v0.26 引入 [Rslib](https://github.com/web-infra-dev/rslib) 提升开发体验、降低贡献门槛的基础上，v0.27 更进一步，对核心模块进行了大规模重构。这使得扩展新设备、添加新 AI 操作的成本变得极低，我们诚挚地欢迎社区开发者踊跃贡献！
+
+**由于本次重构涉及面较广，升级后如遇到任何问题，请随时向我们反馈，我们将第一时间跟进处理。**
+
+### 🌐 接口优化
+- **`aiAssert` 功能全面增强**
+  - 新增 `name` 字段，允许为不同的断言任务命名，方便在 JSON 格式的输出结果中进行识别和解析
+  - 新增 `domIncluded` 和 `screenshotIncluded` 选项，可在断言中灵活控制是否向 AI 发送 DOM 快照和页面截图
+
+### 🤖 Chrome 扩展 Playground 升级
+
+- 所有 Agent API 都能在 Playground 上直接调试和运行！交互、提取、验证三大类方法全覆盖，可视化操作和验证，让你的自动化开发效率飙升
+
+### 📊 报告功能优化
+- **新增标记浮层开关**：报告播放器增加了隐藏标记浮层的开关，方便用户在回放时查看无遮挡的原始页面视图
+
+### 🐞 问题修复
+- 修复了 `aiWaitFor` 在偶现错误导致报告未生成问题
+- 降低 Playwright 插件的内存消耗
+
+## v0.26 - 🚀 工具链全面接入 [Rslib](https://github.com/web-infra-dev/rslib)，大幅提高开发体验、降低贡献门槛
+
+### 🌐 Web 集成优化
+- 支持冻结页面上下文（[freezePageContext](./api.mdx#agentfreezepagecontext)/[unfreezePageContext](./api.mdx#agentunfreezepagecontext)），使后续所有的操作都复用同一个页面快照，避免多次重复获取页面状态
+- 为 Playwright fixture 补全所有 agent api ，简化测试脚本编写，解决使用 agentForPage 无法生成报告的问题
+
+### 📱 Android 自动化增强
+- 新增隐藏键盘策略（[keyboardDismissStrategy](./integrate-with-android.html#androiddevice-的构造函数)），允许指定自动隐藏键盘的方式
+  
+### 📊 报告功能优化
+- 报告内容引入懒解析，解决大体积报告的崩溃问题
+- 报告播放器新增自动缩放开关，方便查看全局视角的回放
+- 支持 aiAssert / aiQuery 等任务在报告中播放，以完整展示整个页面变动过程
+- 修复断言失败时的侧栏状态未显示为失败图标的问题
+- 修复报告中下拉筛选器不能切换筛选的问题
+  
+### 🚀 构建与工程化
+- 构建工具迁移至 [Rslib](https://github.com/web-infra-dev/rslib) 库开发工具，提升构建效率和开发体验
+- 全仓库开启源码跳转，方便开发者查看源码
+- MCP npm 包产物体积优化，从 56M 减少到 30M，大幅提高加载速度
+  
+### 🐞 问题修复
+- CLI 在 keepWindow 为 true 时将自动开启 headed 模式
+- 修复 getGlobalConfig 的实现问题，解决环境变量初始化异常问题
+- 确保 base64 编码中的 mime-type 正确
+- 修复 aiAssert 任务返回值类型
+
 ## v0.25 - 🚀 支持使用图像作为 AI prompt 输入
 
 ### 🎯 核心功能增强

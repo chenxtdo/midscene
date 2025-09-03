@@ -2,7 +2,6 @@
 'use client';
 import './detail-side.less';
 import { timeStr } from '@midscene/visualizer';
-import { paramStr, typeStr } from '@midscene/web/ui-utils';
 
 import { RadiusSettingOutlined } from '@ant-design/icons';
 import type {
@@ -10,6 +9,7 @@ import type {
   ExecutionTaskInsightAssertion,
   ExecutionTaskPlanning,
 } from '@midscene/core';
+import { paramStr, typeStr } from '@midscene/core/agent';
 import {
   highlightColorForType,
   timeCostStrElement,
@@ -226,7 +226,7 @@ const DetailSide = (): JSX.Element => {
   let taskInput: JSX.Element | null = null;
   if (task?.type === 'Planning') {
     const planningTask = task as ExecutionTaskPlanning;
-    const isPageContextFrozen = Boolean((task?.pageContext as any)?._isFrozen);
+    const isPageContextFrozen = Boolean((task?.uiContext as any)?._isFrozen);
     if (planningTask.param?.userInstruction) {
       taskInput = MetaKV({
         data: [
@@ -269,7 +269,7 @@ const DetailSide = (): JSX.Element => {
       });
     }
   } else if (task?.type === 'Insight') {
-    const isPageContextFrozen = Boolean((task?.pageContext as any)?._isFrozen);
+    const isPageContextFrozen = Boolean((task?.uiContext as any)?._isFrozen);
     taskInput = MetaKV({
       data: [
         { key: 'type', content: (task && typeStr(task)) || '' },
@@ -436,7 +436,6 @@ const DetailSide = (): JSX.Element => {
               : null;
 
           return {
-            color: '#06B1AB',
             children: (
               <>
                 <p>
@@ -457,7 +456,6 @@ const DetailSide = (): JSX.Element => {
 
       if ((task as ExecutionTaskPlanning).output?.log) {
         timelineData.push({
-          color: '#06B1AB',
           children: (
             <>
               <p>
@@ -474,7 +472,6 @@ const DetailSide = (): JSX.Element => {
           ?.more_actions_needed_by_instruction === 'boolean'
       ) {
         timelineData.push({
-          color: '#06B1AB',
           children: (
             <>
               <p>

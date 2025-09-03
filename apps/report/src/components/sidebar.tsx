@@ -1,13 +1,13 @@
 import './sidebar.less';
 import { useAllCurrentTasks, useExecutionDump } from '@/components/store';
-import type { ExecutionDump, ExecutionTask, ExecutionTaskInsightLocate } from '@midscene/core';
+import type { ExecutionTask, ExecutionTaskInsightLocate } from '@midscene/core';
+import { typeStr } from '@midscene/core/agent';
 import {
   type AnimationScript,
   iconForStatus,
   timeCostStrElement,
 } from '@midscene/visualizer';
-import { typeStr } from '@midscene/web/ui-utils';
-import { Checkbox, Collapse, Tag, Tooltip } from 'antd';
+import { Checkbox, Tag, Tooltip } from 'antd';
 import { useEffect } from 'react';
 import CameraIcon from '../icons/camera.svg?react';
 import MessageIcon from '../icons/message.svg?react';
@@ -67,19 +67,34 @@ const SideItem = (props: {
 
   const statusIcon = (() => {
     const isFinished = task.status === 'finished';
-    const isAssertionFailed =
-      isFinished && task.subType === 'Assert' && task.output === false;
-    const hasError = isFinished && (task.error || task.errorMessage);
+    const isError = isFinished && (task.error || task.errorMessage);
 
-    if (isAssertionFailed) return iconForStatus('failed');
+    if (isError) {
+      return iconForStatus('failed');
+    }
 
-    if (hasError) return iconForStatus('finishedWithWarning');
+    const isAssertFinishedWithWarning =
+      isFinished &&
+      task.subType === 'Assert' &&
+      task.output === false &&
+      task.log.isWaitForAssert;
+
+    if (isAssertFinishedWithWarning) {
+      return iconForStatus('finishedWithWarning');
+    }
+
+    const isAssertFailed =
+      task.subType === 'Assert' && isFinished && task.output === false;
+
+    if (isAssertFailed) {
+      return iconForStatus('failed');
+    }
 
     return iconForStatus(task.status);
   })();
 
   const titleTextIcon =
-    task.type === 'Planning' ? (
+    task.type === 'Planning' && task.subType !== 'LoadYaml' ? (
       <span
         style={{
           display: 'inline-flex',
@@ -123,6 +138,11 @@ const SideItem = (props: {
         {/* Display usage info in table style if available and Pro mode is enabled */}
         {props.proModeEnabled && (
           <>
+            <Tooltip title="The name of the model used this time">
+              <div className="usage-column model-name">
+                {task.usage?.model_name || '-'}
+              </div>
+            </Tooltip>
             <Tooltip title="Input tokens sent to the AI model">
               <div className="usage-column prompt-tokens">
                 {task.usage?.prompt_tokens || '-'}
@@ -223,28 +243,36 @@ const Sidebar = (props: SidebarProps = {}): JSX.Element => {
       .reduce((acc, task) => acc + (task.usage?.completion_tokens || 0), 0) ||
     0;
 
-  const executions = groupedDump?.executions ?? [];
-
-  // group by vitest_it_name
-  const vitestIts = executions.reduce((acc, execution) => {
-    const vitestItName = execution.vitest_it_name;
-    if (vitestItName) {
-      if (!acc[vitestItName]) {
-        acc[vitestItName] = [];
-      }
-      acc[vitestItName].push(execution);
-    }
-    return acc;
-  }, {} as Record<string, ExecutionDump[]>);
-
-  const vitestItKeys = Object.keys(vitestIts)
-
-  const items = vitestItKeys.map((key) => {
-    return {
-      key: key,
-      label: key,
-      children: <div className="executions-wrapper">
-        {vitestIts[key].map((execution, indexOfExecution) => {
+  const executionContent = groupedDump ? (
+    <div className="execution-info-section">
+      <div className="execution-info-title">
+        <div className="execution-info-title-left">
+          <MessageIcon width={16} height={16} />
+          Execution
+        </div>
+        <div className="execution-info-title-right">
+          <Checkbox
+            className="token-usage-checkbox"
+            checked={proModeEnabled}
+            onChange={(e) => onProModeChange?.(e.target.checked)}
+          >
+            Token usage
+          </Checkbox>
+        </div>
+      </div>
+      <div className={`table-header ${proModeEnabled ? 'pro-mode' : ''}`}>
+        <div className="header-name">Name</div>
+        <div className="header-time">Time</div>
+        {proModeEnabled && (
+          <>
+            <div className="header-model-name">Name</div>
+            <div className="header-prompt">Prompt</div>
+            <div className="header-completion">Completion</div>
+          </>
+        )}
+      </div>
+      <div className="executions-wrapper">
+        {groupedDump.executions.map((execution, indexOfExecution) => {
           const { tasks } = execution;
           const taskList = tasks.map((task, index) => {
             return (
@@ -287,79 +315,79 @@ const Sidebar = (props: SidebarProps = {}): JSX.Element => {
     }
   })
 
-  const executionContent = groupedDump ? (
-    <div className="execution-info-section">
-      <div className="execution-info-title">
-        <div className="execution-info-title-left">
-          <MessageIcon width={16} height={16} />
-          Execution
+      const executionContent = groupedDump ? (
+      <div className="execution-info-section">
+        <div className="execution-info-title">
+          <div className="execution-info-title-left">
+            <MessageIcon width={16} height={16} />
+            Execution
+          </div>
+          <div className="execution-info-title-right">
+            <Checkbox
+              className="token-usage-checkbox"
+              checked={proModeEnabled}
+              onChange={(e) => onProModeChange?.(e.target.checked)}
+            >
+              Token usage
+            </Checkbox>
+          </div>
         </div>
-        <div className="execution-info-title-right">
-          <Checkbox
-            className="token-usage-checkbox"
-            checked={proModeEnabled}
-            onChange={(e) => onProModeChange?.(e.target.checked)}
-          >
-            Token usage
-          </Checkbox>
+        <div className={`table-header ${proModeEnabled ? 'pro-mode' : ''}`}>
+          <div className="header-name">Name</div>
+          <div className="header-time">Time</div>
+          {proModeEnabled && (
+            <>
+              <div className="header-prompt">Prompt</div>
+              <div className="header-completion">Completion</div>
+            </>
+          )}
         </div>
+        <Collapse style={{ overflowY: 'auto' }} items={items} />
       </div>
-      <div className={`table-header ${proModeEnabled ? 'pro-mode' : ''}`}>
-        <div className="header-name">Name</div>
-        <div className="header-time">Time</div>
+      ) : null;
+
+      return (
+      <div className="side-bar">
+        <div className="page-nav">
+          <div className="page-nav-left">
+            <div className="page-nav-title">
+              Report
+              <span className="page-nav-title-hint">
+                Switch: Command + Up / Down
+              </span>
+            </div>
+            <div className="page-nav-toolbar">
+              <div
+                className="icon-button"
+                onClick={() => {
+                  setReplayAllMode?.(true);
+                }}
+              >
+                <PlayIcon />
+              </div>
+            </div>
+          </div>
+        </div>
+        {sideList}
+        {executionContent}
         {proModeEnabled && (
           <>
-            <div className="header-prompt">Prompt</div>
-            <div className="header-completion">Completion</div>
+            <div className="side-seperator side-seperator-line side-seperator-space-up" />
+            <div className="task-token-section">
+              <div className="task-meta-tokens">
+                <div className="token-total-label">Total</div>
+                <div className="token-total-item">
+                  <span className="token-value">{totalPromptTokens}</span>
+                </div>
+                <div className="token-total-item">
+                  <span className="token-value">{totalCompletionTokens}</span>
+                </div>
+              </div>
+            </div>
           </>
         )}
       </div>
-      <Collapse style={{ overflowY: 'auto' }} items={items} />
-    </div>
-  ) : null;
-
-  return (
-    <div className="side-bar">
-      <div className="page-nav">
-        <div className="page-nav-left">
-          <div className="page-nav-title">
-            Report
-            <span className="page-nav-title-hint">
-              Switch: Command + Up / Down
-            </span>
-          </div>
-          <div className="page-nav-toolbar">
-            <div
-              className="icon-button"
-              onClick={() => {
-                setReplayAllMode?.(true);
-              }}
-            >
-              <PlayIcon />
-            </div>
-          </div>
-        </div>
-      </div>
-      {sideList}
-      {executionContent}
-      {proModeEnabled && (
-        <>
-          <div className="side-seperator side-seperator-line side-seperator-space-up" />
-          <div className="task-token-section">
-            <div className="task-meta-tokens">
-              <div className="token-total-label">Total</div>
-              <div className="token-total-item">
-                <span className="token-value">{totalPromptTokens}</span>
-              </div>
-              <div className="token-total-item">
-                <span className="token-value">{totalCompletionTokens}</span>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
+      );
 };
 
-export default Sidebar;
+      export default Sidebar;

@@ -1,11 +1,12 @@
 import type {
   DeviceAction,
-  PageType,
+  InterfaceType,
   PlanningAIResponse,
   UIContext,
 } from '@/types';
-import { vlLocateMode } from '@midscene/shared/env';
+import { type IModelPreferences, vlLocateMode } from '@midscene/shared/env';
 import { paddingToMatchBlockByBase64 } from '@midscene/shared/img';
+import { getDebug } from '@midscene/shared/logger';
 import { assert } from '@midscene/shared/utils';
 import {
   AIActionType,
@@ -13,6 +14,7 @@ import {
   buildYamlFlowFromPlans,
   callAiFn,
   fillBboxParam,
+  findAllMidsceneLocatorField,
   markupImageForLLM,
   warnGPT4oSizeLimit,
 } from './common';
@@ -23,12 +25,14 @@ import {
 } from './prompt/llm-planning';
 import { describeUserPage } from './prompt/util';
 
+const debug = getDebug('planning');
+
 export async function plan(
   userInstruction: string,
   opts: {
     context: UIContext;
-    pageType: PageType;
-    actionSpace: DeviceAction[];
+    interfaceType: InterfaceType;
+    actionSpace: DeviceAction<any>[];
     callAI?: typeof callAiFn<PlanningAIResponse>;
     log?: string;
     actionContext?: string;
@@ -36,12 +40,18 @@ export async function plan(
 ): Promise<PlanningAIResponse> {
   const { callAI, context } = opts || {};
   const { screenshotBase64, size } = context;
-  const { description: pageDescription, elementById } =
-    await describeUserPage(context);
+
+  const modelPreferences: IModelPreferences = {
+    intent: 'planning',
+  };
+  const { description: pageDescription, elementById } = await describeUserPage(
+    context,
+    modelPreferences,
+  );
 
   const systemPrompt = await systemPromptToTaskPlanning({
     actionSpace: opts.actionSpace,
-    vlMode: vlLocateMode(),
+    vlMode: vlLocateMode(modelPreferences),
   });
   const taskBackgroundContextText = generateTaskBackgroundContext(
     userInstruction,
@@ -49,16 +59,16 @@ export async function plan(
     opts.actionContext,
   );
   const userInstructionPrompt = await automationUserPrompt(
-    vlLocateMode(),
+    vlLocateMode(modelPreferences),
   ).format({
     pageDescription,
     taskBackgroundContext: taskBackgroundContextText,
   });
 
   let imagePayload = screenshotBase64;
-  if (vlLocateMode() === 'qwen-vl') {
+  if (vlLocateMode(modelPreferences) === 'qwen-vl') {
     imagePayload = await paddingToMatchBlockByBase64(imagePayload);
-  } else if (!vlLocateMode()) {
+  } else if (!vlLocateMode(modelPreferences)) {
     imagePayload = await markupImageForLLM(
       screenshotBase64,
       context.tree,
@@ -66,7 +76,7 @@ export async function plan(
     );
   }
 
-  warnGPT4oSizeLimit(size);
+  warnGPT4oSizeLimit(size, modelPreferences);
 
   const msgs: AIArgs = [
     { role: 'system', content: systemPrompt },
@@ -89,7 +99,11 @@ export async function plan(
   ];
 
   const call = callAI || callAiFn;
-  const { content, usage } = await call(msgs, AIActionType.PLAN);
+  const { content, usage } = await call(
+    msgs,
+    AIActionType.PLAN,
+    modelPreferences,
+  );
   const rawResponse = JSON.stringify(content, undefined, 2);
   const planFromAI = content;
 
@@ -100,41 +114,48 @@ export async function plan(
     actions,
     rawResponse,
     usage,
-    yamlFlow: buildYamlFlowFromPlans(actions, planFromAI.sleep),
+    yamlFlow: buildYamlFlowFromPlans(
+      actions,
+      opts.actionSpace,
+      planFromAI.sleep,
+    ),
   };
 
   assert(planFromAI, "can't get plans from AI");
 
-  if (vlLocateMode()) {
-    actions.forEach((action) => {
-      if (action.locate) {
-        try {
-          action.locate = fillBboxParam(action.locate, size.width, size.height);
-        } catch (e) {
-          throw new Error(
-            `Failed to fill locate param: ${planFromAI.error} (${
-              e instanceof Error ? e.message : 'unknown error'
-            })`,
-            {
-              cause: e,
-            },
+  // TODO: use zod.parse to parse the action.param, and then fill the bbox param.
+  actions.forEach((action) => {
+    const type = action.type;
+    const actionInActionSpace = opts.actionSpace.find(
+      (action) => action.name === type,
+    );
+    const locateFields = actionInActionSpace
+      ? findAllMidsceneLocatorField(actionInActionSpace.paramSchema)
+      : [];
+
+    debug('locateFields', locateFields);
+
+    locateFields.forEach((field) => {
+      const locateResult = action.param[field];
+      if (locateResult) {
+        if (vlLocateMode(modelPreferences)) {
+          action.param[field] = fillBboxParam(
+            locateResult,
+            size.width,
+            size.height,
+            modelPreferences,
           );
+        } else {
+          const element = elementById(locateResult);
+          if (element) {
+            action.param[field].id = element.id;
+          }
         }
       }
     });
-    // in Qwen-VL, error means error. In GPT-4o, error may mean more actions are needed.
-    assert(!planFromAI.error, `Failed to plan actions: ${planFromAI.error}`);
-  } else {
-    actions.forEach((action) => {
-      if (action.locate?.id) {
-        // The model may return indexId, need to perform a query correction to avoid exceptions
-        const element = elementById(action.locate.id);
-        if (element) {
-          action.locate.id = element.id;
-        }
-      }
-    });
-  }
+  });
+  // in Qwen-VL, error means error. In GPT-4o, error may mean more actions are needed.
+  assert(!planFromAI.error, `Failed to plan actions: ${planFromAI.error}`);
 
   if (
     actions.length === 0 &&

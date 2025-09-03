@@ -13,6 +13,7 @@ import {
   describeUserPage,
   elementByPositionWithElementInfo,
 } from '@/ai-model/prompt/util';
+import type { GroupedActionDump } from '@/types';
 import { vlLocateMode } from '@midscene/shared/env';
 
 describe('prompt utils - describeUserPage', () => {
@@ -31,10 +32,14 @@ describe('prompt utils - describeUserPage', () => {
     'describe context ',
     async () => {
       const context = await getContextFromFixture('taobao');
-      const { description } = await describeUserPage(context.context, {
-        domIncluded: true,
-        visibleOnly: false,
-      });
+      const { description } = await describeUserPage(
+        context.context,
+        { intent: 'default' },
+        {
+          domIncluded: true,
+          visibleOnly: false,
+        },
+      );
 
       lengthOfDescription = description.length;
       const stringLengthOfEachItem =
@@ -48,12 +53,16 @@ describe('prompt utils - describeUserPage', () => {
   it('describe context, truncateTextLength = 100, filterNonTextContent = true', async () => {
     const context = await getContextFromFixture('taobao');
 
-    const { description } = await describeUserPage(context.context, {
-      truncateTextLength: 100,
-      filterNonTextContent: true,
-      domIncluded: true,
-      visibleOnly: false,
-    });
+    const { description } = await describeUserPage(
+      context.context,
+      { intent: 'default' },
+      {
+        truncateTextLength: 100,
+        filterNonTextContent: true,
+        domIncluded: true,
+        visibleOnly: false,
+      },
+    );
 
     const stringLengthOfEachItem =
       description.length / treeToList(context.context.tree).length;
@@ -65,10 +74,14 @@ describe('prompt utils - describeUserPage', () => {
   it('describe context, domIncluded = "visible-only"', async () => {
     const context = await getContextFromFixture('taobao');
 
-    const { description } = await describeUserPage(context.context, {
-      filterNonTextContent: true,
-      domIncluded: 'visible-only',
-    });
+    const { description } = await describeUserPage(
+      context.context,
+      { intent: 'default' },
+      {
+        filterNonTextContent: true,
+        domIncluded: 'visible-only',
+      },
+    );
 
     expect(description).toBeTruthy();
     expect(description.length).toBeLessThan(
@@ -78,12 +91,16 @@ describe('prompt utils - describeUserPage', () => {
 
   it('describe context with non-vl mode', async () => {
     // Mock vlLocateMode to return false for this test
-    vi.mocked(vlLocateMode).mockReturnValue(false);
+    vi.mocked(vlLocateMode).mockReturnValue(undefined);
 
     const context = await getContextFromFixture('taobao');
-    const { description } = await describeUserPage(context.context, {
-      domIncluded: false,
-    });
+    const { description } = await describeUserPage(
+      context.context,
+      { intent: 'default' },
+      {
+        domIncluded: false,
+      },
+    );
 
     // In non-vl mode, description should include page elements even when domIncluded is false
     expect(description).toBeTruthy();
@@ -94,9 +111,13 @@ describe('prompt utils - describeUserPage', () => {
     vi.mocked(vlLocateMode).mockReturnValue('qwen-vl');
 
     const context = await getContextFromFixture('taobao');
-    const { description } = await describeUserPage(context.context, {
-      domIncluded: false,
-    });
+    const { description } = await describeUserPage(
+      context.context,
+      { intent: 'default' },
+      {
+        domIncluded: false,
+      },
+    );
 
     // In vl mode, description should be empty if domIncluded is false
     expect(description).toBeFalsy();
@@ -141,7 +162,7 @@ describe('prompt utils - elementByPositionWithElementInfo', () => {
       y: targetNode.node.rect.top + targetNode.node.rect.height / 2,
     };
     const element = elementByPositionWithElementInfo(
-      dump.executions[0].tasks[0].pageContext.tree,
+      dump.executions[0].tasks[0].uiContext.tree,
       rectCenter,
       {
         requireStrictDistance: false,
@@ -159,7 +180,9 @@ describe('prompt utils - elementByPositionWithElementInfo', () => {
       'fixtures',
       'dump-for-utils-test.json',
     );
-    const dump = JSON.parse(fs.readFileSync(dumpPath, 'utf8'));
+    const dump: GroupedActionDump = JSON.parse(
+      fs.readFileSync(dumpPath, 'utf8'),
+    );
     const targetNode = {
       node: {
         content: '选好了',
@@ -189,7 +212,7 @@ describe('prompt utils - elementByPositionWithElementInfo', () => {
       y: targetNode.node.rect.top + targetNode.node.rect.height / 2,
     };
     const element = elementByPositionWithElementInfo(
-      dump.executions[0].tasks[0].pageContext.tree,
+      dump.executions[0].tasks[0].uiContext?.tree!,
       rectCenter,
       {
         requireStrictDistance: false,
@@ -238,7 +261,7 @@ describe('prompt utils - elementByPositionWithElementInfo', () => {
       y: targetNode.node.rect.top + targetNode.node.rect.height / 2,
     };
     const element = elementByPositionWithElementInfo(
-      dump.executions[0].tasks[0].pageContext.tree,
+      dump.executions[0].tasks[0].uiContext?.tree,
       rectCenter,
       {
         requireStrictDistance: true,

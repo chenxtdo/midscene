@@ -79,7 +79,7 @@ export const ServiceModeControl: React.FC<ServiceModeControlProps> = ({
     if (serviceMode === 'Server') {
       overrideServerConfig(config);
     }
-  }, [config, serviceMode]);
+  }, [config, serviceMode, serverValid]);
 
   // Determine content based on service mode
   const statusContent = serviceMode === 'Server' && renderServerTip();

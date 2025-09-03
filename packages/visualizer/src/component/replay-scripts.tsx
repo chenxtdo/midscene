@@ -1,7 +1,7 @@
 'use client';
 import './player.less';
 import { mousePointer } from '@/utils';
-import { paramStr, typeStr } from '@midscene/web/ui-utils';
+import { paramStr, typeStr } from '@midscene/core/agent';
 
 import type {
   ExecutionDump,
@@ -122,9 +122,15 @@ export interface ReplayScriptsInfo {
   width?: number;
   height?: number;
   sdkVersion?: string;
-  modelName?: string;
-  modelDescription?: string;
+  modelBriefs: string[];
 }
+
+const capitalizeFirstLetter = (str: string) => {
+  if (typeof str !== 'string' || str.length === 0) {
+    return str;
+  }
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
 
 export const allScriptsFromDump = (
   dump: GroupedActionDump,
@@ -133,27 +139,18 @@ export const allScriptsFromDump = (
   let width: number | undefined = undefined;
   let height: number | undefined = undefined;
   let sdkVersion: string | undefined = undefined;
-  let modelName: string | undefined = undefined;
-  let modelDescription: string | undefined = undefined;
+
+  const modelBriefsSet = new Set<string>();
 
   dump.executions.forEach((execution) => {
     if (execution.sdkVersion) {
       sdkVersion = execution.sdkVersion;
     }
 
-    if (execution.model_name) {
-      modelName = execution.model_name;
-    }
-
-    if (execution.model_description) {
-      modelDescription = execution.model_description;
-    }
-
     execution.tasks.forEach((task) => {
-      const insightTask = task as ExecutionTaskInsightLocate;
-      if (insightTask.pageContext?.size?.width) {
-        width = insightTask.pageContext.size.width;
-        height = insightTask.pageContext.size.height;
+      if (task.uiContext?.size?.width) {
+        width = task.uiContext.size.width;
+        height = task.uiContext.size.height;
       }
     });
   });
@@ -163,8 +160,7 @@ export const allScriptsFromDump = (
     return {
       scripts: [],
       sdkVersion,
-      modelName,
-      modelDescription,
+      modelBriefs: [],
     };
   }
 
@@ -174,6 +170,18 @@ export const allScriptsFromDump = (
     if (scripts) {
       allScripts.push(...scripts);
     }
+    execution.tasks.forEach((task) => {
+      if (task.usage) {
+        const { model_name, model_description, intent } = task.usage;
+        if (intent && model_name) {
+          modelBriefsSet.add(
+            model_description
+              ? `${capitalizeFirstLetter(intent)}/${model_name}(${model_description})`
+              : model_name,
+          );
+        }
+      }
+    });
   });
 
   const allScriptsWithoutIntermediateDoneFrame = allScripts.filter(
@@ -185,13 +193,29 @@ export const allScriptsFromDump = (
     },
   );
 
+  const modelBriefs: string[] = (() => {
+    const list = [...modelBriefsSet];
+    if (!list.length) {
+      return list;
+    }
+    const firstOneInfo = list[0]?.split('/', 2)[1];
+    // merge same modelName and modelDescription
+    if (
+      firstOneInfo &&
+      list.slice(1).every((item) => item?.split('/', 2)[1] === firstOneInfo)
+    ) {
+      return [firstOneInfo];
+    }
+
+    return list;
+  })();
+
   return {
     scripts: allScriptsWithoutIntermediateDoneFrame,
     width,
     height,
     sdkVersion,
-    modelName,
-    modelDescription,
+    modelBriefs,
   };
 };
 
@@ -298,7 +322,7 @@ export const generateAnimationScripts = (
           pointerTop: resultElement.center[1],
         };
       }
-      const context = insightTask.pageContext;
+      const context = insightTask.uiContext;
       if (context?.screenshotBase64) {
         const insightDump = insightTask.log?.dump;
         const insightContentLength = context.tree

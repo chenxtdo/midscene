@@ -2,13 +2,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { PlanningAIResponse, Rect } from '@midscene/core';
 import { NodeType } from '@midscene/shared/constants';
-import { vlLocateMode } from '@midscene/shared/env';
 import {
   compositeElementInfoImg,
   imageInfoOfBase64,
   localImg2Base64,
 } from '@midscene/shared/img';
-import { parseContextFromWebPage } from '@midscene/web';
+import { WebPageContextParser } from '@midscene/web';
 
 export const repeatTime = 1;
 
@@ -213,9 +212,7 @@ export async function buildContextByImage(imagePath: string) {
     },
     size: () => size,
   };
-  return await parseContextFromWebPage(fakePage as any, {
-    ignoreMarker: true,
-  });
+  return await WebPageContextParser(fakePage as any);
 }
 
 export async function buildContext(pageName: string) {
@@ -240,9 +237,7 @@ export async function buildContext(pageName: string) {
     },
   };
 
-  const context = await parseContextFromWebPage(fakePage as any, {
-    ignoreMarker: !!vlLocateMode(),
-  });
+  const context = await WebPageContextParser(fakePage as any, {});
   return context;
 }
 

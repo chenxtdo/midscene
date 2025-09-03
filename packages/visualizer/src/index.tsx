@@ -1,4 +1,3 @@
-export { useStaticPageAgent } from './component/playground/useStaticPageAgent';
 import './component/playground/index.less';
 export {
   type AnimationScript,
@@ -28,7 +27,6 @@ export { PromptInput } from './component/playground/PromptInput';
 export { Player } from './component/player';
 export { Blackboard } from './component/blackboard';
 export { GithubStar } from './component/github-star';
-export { Describer } from './component/describer';
 
 // Export playground utilities
 export {
@@ -36,13 +34,20 @@ export {
   cancelTask,
   overrideServerConfig,
   getTaskProgress,
+  getActionSpace,
   checkServerStatus,
   actionNameForType,
   staticAgentFromContext,
-  formatErrorMessage,
   getPlaceholderForType,
   blankResult,
 } from './component/playground/playground-utils';
+
+// Export playground execution utilities
+export {
+  executeAction,
+  validateStructuredParams,
+  formatErrorMessage,
+} from './component/playground/playground-execution';
 
 export { timeStr, filterBase64Value } from './utils';
 

@@ -1,26 +1,49 @@
 import * as Z from 'zustand';
 
 const { create } = Z;
+
+const AUTO_ZOOM_KEY = 'midscene-auto-zoom';
+const BACKGROUND_VISIBLE_KEY = 'midscene-background-visible';
+const ELEMENTS_VISIBLE_KEY = 'midscene-elements-visible';
+
 export const useBlackboardPreference = create<{
-  markerVisible: boolean;
+  backgroundVisible: boolean;
   elementsVisible: boolean;
-  setMarkerVisible: (visible: boolean) => void;
-  setTextsVisible: (visible: boolean) => void;
-}>((set) => ({
-  markerVisible: true,
-  elementsVisible: true,
-  setMarkerVisible: (visible: boolean) => {
-    set({ markerVisible: visible });
-  },
-  setTextsVisible: (visible: boolean) => {
-    set({ elementsVisible: visible });
-  },
-}));
+  autoZoom: boolean;
+  setBackgroundVisible: (visible: boolean) => void;
+  setElementsVisible: (visible: boolean) => void;
+  setAutoZoom: (enabled: boolean) => void;
+}>((set) => {
+  const savedAutoZoom = localStorage.getItem(AUTO_ZOOM_KEY) !== 'false';
+  const savedBackgroundVisible =
+    localStorage.getItem(BACKGROUND_VISIBLE_KEY) !== 'false';
+  const savedElementsVisible =
+    localStorage.getItem(ELEMENTS_VISIBLE_KEY) !== 'false';
+  return {
+    backgroundVisible: savedBackgroundVisible,
+    elementsVisible: savedElementsVisible,
+    autoZoom: savedAutoZoom,
+    setBackgroundVisible: (visible: boolean) => {
+      set({ backgroundVisible: visible });
+      localStorage.setItem(BACKGROUND_VISIBLE_KEY, visible.toString());
+    },
+    setElementsVisible: (visible: boolean) => {
+      set({ elementsVisible: visible });
+      localStorage.setItem(ELEMENTS_VISIBLE_KEY, visible.toString());
+    },
+    setAutoZoom: (enabled: boolean) => {
+      set({ autoZoom: enabled });
+      localStorage.setItem(AUTO_ZOOM_KEY, enabled.toString());
+    },
+  };
+});
 
 const CONFIG_KEY = 'midscene-env-config';
 const SERVICE_MODE_KEY = 'midscene-service-mode';
 const TRACKING_ACTIVE_TAB_KEY = 'midscene-tracking-active-tab';
 const DEEP_THINK_KEY = 'midscene-deep-think';
+const SCREENSHOT_INCLUDED_KEY = 'midscene-screenshot-included';
+const DOM_INCLUDED_KEY = 'midscene-dom-included';
 const getConfigStringFromLocalStorage = () => {
   const configString = localStorage.getItem(CONFIG_KEY);
   return configString || '';
@@ -75,6 +98,10 @@ export const useEnvConfig = create<{
   setForceSameTabNavigation: (forceSameTabNavigation: boolean) => void;
   deepThink: boolean;
   setDeepThink: (deepThink: boolean) => void;
+  screenshotIncluded: boolean;
+  setScreenshotIncluded: (screenshotIncluded: boolean) => void;
+  domIncluded: boolean | 'visible-only';
+  setDomIncluded: (domIncluded: boolean | 'visible-only') => void;
   popupTab: 'playground' | 'bridge' | 'recorder';
   setPopupTab: (tab: 'playground' | 'bridge' | 'recorder') => void;
 }>((set, get) => {
@@ -87,6 +114,9 @@ export const useEnvConfig = create<{
   const savedForceSameTabNavigation =
     localStorage.getItem(TRACKING_ACTIVE_TAB_KEY) !== 'false';
   const savedDeepThink = localStorage.getItem(DEEP_THINK_KEY) === 'true';
+  const savedScreenshotIncluded =
+    localStorage.getItem(SCREENSHOT_INCLUDED_KEY) !== 'false';
+  const savedDomIncluded = localStorage.getItem(DOM_INCLUDED_KEY) || 'false';
   return {
     serviceMode: ifInExtension
       ? 'In-Browser-Extension'
@@ -122,6 +152,22 @@ export const useEnvConfig = create<{
     setDeepThink: (deepThink: boolean) => {
       set({ deepThink });
       localStorage.setItem(DEEP_THINK_KEY, deepThink.toString());
+    },
+    screenshotIncluded: savedScreenshotIncluded,
+    setScreenshotIncluded: (screenshotIncluded: boolean) => {
+      set({ screenshotIncluded });
+      localStorage.setItem(
+        SCREENSHOT_INCLUDED_KEY,
+        screenshotIncluded.toString(),
+      );
+    },
+    domIncluded:
+      savedDomIncluded === 'visible-only'
+        ? 'visible-only'
+        : savedDomIncluded === 'true',
+    setDomIncluded: (domIncluded: boolean | 'visible-only') => {
+      set({ domIncluded });
+      localStorage.setItem(DOM_INCLUDED_KEY, domIncluded.toString());
     },
     popupTab: 'playground',
     setPopupTab: (tab: 'playground' | 'bridge' | 'recorder') => {

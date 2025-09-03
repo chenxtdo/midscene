@@ -2,14 +2,19 @@ import { distance } from '@/ai-model/prompt/util';
 import Insight from '@/insight';
 import { sleep } from '@/utils';
 import { vlLocateMode } from '@midscene/shared/env';
+import { globalConfigManager } from '@midscene/shared/env';
 import { getContextFromFixture } from 'tests/evaluation';
-import { describe, expect, test, vi } from 'vitest';
+import { beforeAll, describe, expect, test, vi } from 'vitest';
 
 vi.setConfig({
   testTimeout: 60 * 1000,
 });
 
-const vlMode = vlLocateMode();
+const vlMode = vlLocateMode({ intent: 'grounding' });
+
+beforeAll(async () => {
+  await globalConfigManager.init();
+});
 
 describe.skipIf(!vlMode)('insight locate with deep think', () => {
   test('insight locate with search area', async () => {
@@ -69,6 +74,9 @@ test.skip('insight locate with search area', async () => {
 
 describe(
   'insight describe',
+  {
+    timeout: 2 * 60 * 1000,
+  },
   () => {
     test('insight describe - by rect', async () => {
       const { context } = await getContextFromFixture('taobao');
@@ -90,8 +98,5 @@ describe(
 
       expect(description).toBeDefined();
     });
-  },
-  {
-    timeout: 2 * 60 * 1000,
   },
 );

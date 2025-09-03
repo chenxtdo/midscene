@@ -22,7 +22,6 @@ export type { ChatCompletionMessageParam } from 'openai/resources/index';
 export {
   AiLocateElement,
   AiExtractElementInfo,
-  AiAssert,
   AiLocateSection,
 } from './inspect';
 
@@ -34,3 +33,18 @@ export {
 export { vlmPlanning, resizeImageForUiTars } from './ui-tars-planning';
 
 export { AIActionType, type AIArgs } from './common';
+
+export {
+  getMidsceneLocationSchema,
+  type MidsceneLocationResultType,
+  PointSchema,
+  SizeSchema,
+  RectSchema,
+  TMultimodalPromptSchema,
+  TUserPromptSchema,
+  type TMultimodalPrompt,
+  type TUserPrompt,
+  findAllMidsceneLocatorField,
+  dumpActionParam,
+  loadActionParam,
+} from './common';

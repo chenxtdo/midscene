@@ -5,19 +5,20 @@
   The page must be active when interacting with it.
 */
 
-import type { WebKeyInput } from '@/common/page';
-import { limitOpenNewTabScript } from '@/common/ui-utils';
-import { type AbstractPage, type MouseButton, commonWebActions } from '@/page';
-import type {
-  DeviceAction,
-  ElementTreeNode,
-  Point,
-  Size,
-} from '@midscene/core';
+import { limitOpenNewTabScript } from '@/web-element';
+import type { ElementTreeNode, Point, Size, UIContext } from '@midscene/core';
+import type { AbstractInterface, DeviceAction } from '@midscene/core/device';
 import type { ElementInfo } from '@midscene/shared/extractor';
 import { treeToList } from '@midscene/shared/extractor';
+import { createImgBase64ByFormat } from '@midscene/shared/img';
 import { assert } from '@midscene/shared/utils';
 import type { Protocol as CDPTypes } from 'devtools-protocol';
+import { WebPageContextParser } from '../web-element';
+import {
+  type KeyInput,
+  type MouseButton,
+  commonWebActionsForWebPage,
+} from '../web-page';
 import { CdpKeyboard } from './cdpInput';
 import {
   getHtmlElementScript,
@@ -29,13 +30,10 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-declare const __VERSION__: string;
-
-export default class ChromeExtensionProxyPage implements AbstractPage {
-  pageType = 'chrome-extension-proxy';
+export default class ChromeExtensionProxyPage implements AbstractInterface {
+  interfaceType = 'chrome-extension-proxy';
 
   public forceSameTabNavigation: boolean;
-  private version: string = __VERSION__;
 
   private viewportSize?: Size;
 
@@ -56,7 +54,7 @@ export default class ChromeExtensionProxyPage implements AbstractPage {
   }
 
   actionSpace(): DeviceAction[] {
-    return commonWebActions;
+    return commonWebActionsForWebPage(this);
   }
 
   public async setActiveTabId(tabId: number) {
@@ -299,8 +297,12 @@ export default class ChromeExtensionProxyPage implements AbstractPage {
     const expression = () => {
       (window as any).midscene_element_inspector.setNodeHashCacheListOnWindow();
 
+      const tree = (
+        window as any
+      ).midscene_element_inspector.webExtractNodeTree();
+
       return {
-        tree: (window as any).midscene_element_inspector.webExtractNodeTree(),
+        tree,
         size: {
           width: document.documentElement.clientWidth,
           height: document.documentElement.clientHeight,
@@ -326,7 +328,7 @@ export default class ChromeExtensionProxyPage implements AbstractPage {
         `Failed to get page content from page, error: ${errorDescription}`,
       );
     }
-    // console.log('returnValue', returnValue.result.value);
+
     return returnValue.result.value as {
       tree: ElementTreeNode<ElementInfo>;
       size: Size;
@@ -339,8 +341,16 @@ export default class ChromeExtensionProxyPage implements AbstractPage {
     });
   }
 
-  // current implementation is wait until domReadyState is complete
-  public async waitUntilNetworkIdle() {
+  async beforeAction(): Promise<void> {
+    // current implementation is wait until domReadyState is complete
+    try {
+      await this.waitUntilNetworkIdle();
+    } catch (error) {
+      // console.warn('Failed to wait until network idle', error);
+    }
+  }
+
+  private async waitUntilNetworkIdle() {
     const timeout = 10000;
     const startTime = Date.now();
     let lastReadyState = '';
@@ -428,6 +438,10 @@ export default class ChromeExtensionProxyPage implements AbstractPage {
     return content?.tree || { node: null, children: [] };
   }
 
+  async getContext(): Promise<UIContext> {
+    return await WebPageContextParser(this, {});
+  }
+
   async size() {
     if (this.viewportSize) return this.viewportSize;
     const content = await this.getPageContentByCDP();
@@ -437,11 +451,12 @@ export default class ChromeExtensionProxyPage implements AbstractPage {
   async screenshotBase64() {
     // screenshot by cdp
     await this.hideMousePointer();
+    const format = 'jpeg';
     const base64 = await this.sendCommandToDebugger('Page.captureScreenshot', {
-      format: 'jpeg',
+      format,
       quality: 90,
     });
-    return `data:image/jpeg;base64,${base64.data}`;
+    return createImgBase64ByFormat(format, base64.data);
   }
 
   async url() {
@@ -635,6 +650,8 @@ export default class ChromeExtensionProxyPage implements AbstractPage {
       to: { x: number; y: number },
     ) => {
       await this.mouse.move(from.x, from.y);
+
+      await sleep(200);
       await this.sendCommandToDebugger('Input.dispatchMouseEvent', {
         type: 'mousePressed',
         x: from.x,
@@ -642,7 +659,17 @@ export default class ChromeExtensionProxyPage implements AbstractPage {
         button: 'left',
         clickCount: 1,
       });
-      await this.mouse.move(to.x, to.y);
+
+      await sleep(300);
+
+      await this.sendCommandToDebugger('Input.dispatchMouseEvent', {
+        type: 'mouseMoved',
+        x: to.x,
+        y: to.y,
+      });
+
+      await sleep(500);
+
       await this.sendCommandToDebugger('Input.dispatchMouseEvent', {
         type: 'mouseReleased',
         x: to.x,
@@ -650,6 +677,10 @@ export default class ChromeExtensionProxyPage implements AbstractPage {
         button: 'left',
         clickCount: 1,
       });
+
+      await sleep(200);
+
+      await this.mouse.move(to.x, to.y);
     },
   };
 
@@ -662,8 +693,8 @@ export default class ChromeExtensionProxyPage implements AbstractPage {
     },
     press: async (
       action:
-        | { key: WebKeyInput; command?: string }
-        | { key: WebKeyInput; command?: string }[],
+        | { key: KeyInput; command?: string }
+        | { key: KeyInput; command?: string }[],
     ) => {
       const cdpKeyboard = new CdpKeyboard({
         send: this.sendCommandToDebugger.bind(this),

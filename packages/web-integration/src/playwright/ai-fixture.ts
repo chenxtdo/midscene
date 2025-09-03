@@ -1,13 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import type { PageAgent, PageAgentOpt, WebPageAgentOpt } from '@/common/agent';
-import { replaceIllegalPathCharsAndSpace } from '@/common/utils';
-import { PlaywrightAgent } from '@/playwright/index';
-import type { AgentWaitForOpt } from '@midscene/core';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { PlaywrightAgent, type PlaywrightWebPage } from '@/playwright/index';
+import type { WebPageAgentOpt } from '@/web-element';
+import type { AgentOpt, Agent as PageAgent } from '@midscene/core/agent';
 import {
   DEFAULT_WAIT_FOR_NAVIGATION_TIMEOUT,
   DEFAULT_WAIT_FOR_NETWORK_IDLE_TIMEOUT,
 } from '@midscene/shared/constants';
 import { getDebug } from '@midscene/shared/logger';
+import { replaceIllegalPathCharsAndSpace } from '@midscene/shared/utils';
 import { type TestInfo, type TestType, test } from '@playwright/test';
 import type { Page as OriginPlaywrightPage } from 'playwright';
 export type APITestType = Pick<TestType<any, any>, 'step'>;
@@ -52,7 +55,7 @@ export const PlaywrightAiFixture = (options?: {
     waitForNetworkIdleTimeout = DEFAULT_WAIT_FOR_NETWORK_IDLE_TIMEOUT,
     waitForNavigationTimeout = DEFAULT_WAIT_FOR_NAVIGATION_TIMEOUT,
   } = options ?? {};
-  const pageAgentMap: Record<string, PageAgent> = {};
+  const pageAgentMap: Record<string, PageAgent<PlaywrightWebPage>> = {};
   const createOrReuseAgentForPage = (
     page: OriginPlaywrightPage,
     testInfo: TestInfo, // { testId: string; taskFile: string; taskTitle: string },
@@ -101,6 +104,7 @@ export const PlaywrightAiFixture = (options?: {
       | 'aiScroll'
       | 'aiTap'
       | 'aiRightClick'
+      | 'aiDoubleClick'
       | 'aiQuery'
       | 'aiAssert'
       | 'aiWaitFor'
@@ -154,15 +158,24 @@ export const PlaywrightAiFixture = (options?: {
   }
 
   const updateDumpAnnotation = (test: TestInfo, dump: string) => {
+    // Write dump to temporary file
+    const tempFileName = `midscene-dump-${test.testId || randomUUID()}-${Date.now()}.json`;
+    const tempFilePath = join(tmpdir(), tempFileName);
+
+    writeFileSync(tempFilePath, dump, 'utf-8');
+    debugPage(`Dump written to temp file: ${tempFilePath}`);
+
+    // Store only the file path in annotation
     const currentAnnotation = test.annotations.find((item) => {
       return item.type === midsceneDumpAnnotationId;
     });
     if (currentAnnotation) {
-      currentAnnotation.description = dump;
+      // Store file path instead of dump content
+      currentAnnotation.description = tempFilePath;
     } else {
       test.annotations.push({
         type: midsceneDumpAnnotationId,
-        description: dump,
+        description: tempFilePath,
       });
     }
   };
@@ -176,7 +189,7 @@ export const PlaywrightAiFixture = (options?: {
       await use(
         async (
           propsPage?: OriginPlaywrightPage | undefined,
-          opts?: PageAgentOpt,
+          opts?: AgentOpt,
         ) => {
           const agent = createOrReuseAgentForPage(propsPage || page, testInfo, {
             waitForNavigationTimeout,
@@ -233,6 +246,18 @@ export const PlaywrightAiFixture = (options?: {
         testInfo,
         use,
         aiActionType: 'aiRightClick',
+      });
+    },
+    aiDoubleClick: async (
+      { page }: { page: OriginPlaywrightPage },
+      use: any,
+      testInfo: TestInfo,
+    ) => {
+      await generateAiFunction({
+        page,
+        testInfo,
+        use,
+        aiActionType: 'aiDoubleClick',
       });
     },
     aiHover: async (
@@ -455,7 +480,10 @@ export const PlaywrightAiFixture = (options?: {
 };
 
 export type PlayWrightAiFixtureType = {
-  agentForPage: (page?: any, opts?: any) => Promise<PageAgent>;
+  agentForPage: (
+    page?: any,
+    opts?: any,
+  ) => Promise<PageAgent<PlaywrightWebPage>>;
   ai: <T = any>(prompt: string) => Promise<T>;
   aiAction: (taskPrompt: string) => ReturnType<PageAgent['aiAction']>;
   aiTap: (
@@ -464,6 +492,9 @@ export type PlayWrightAiFixtureType = {
   aiRightClick: (
     ...args: Parameters<PageAgent['aiRightClick']>
   ) => ReturnType<PageAgent['aiRightClick']>;
+  aiDoubleClick: (
+    ...args: Parameters<PageAgent['aiDoubleClick']>
+  ) => ReturnType<PageAgent['aiDoubleClick']>;
   aiHover: (
     ...args: Parameters<PageAgent['aiHover']>
   ) => ReturnType<PageAgent['aiHover']>;
@@ -482,7 +513,7 @@ export type PlayWrightAiFixtureType = {
   aiAssert: (
     ...args: Parameters<PageAgent['aiAssert']>
   ) => ReturnType<PageAgent['aiAssert']>;
-  aiWaitFor: (assertion: string, opt?: AgentWaitForOpt) => Promise<void>;
+  aiWaitFor: (...args: Parameters<PageAgent['aiWaitFor']>) => Promise<void>;
   aiLocate: (
     ...args: Parameters<PageAgent['aiLocate']>
   ) => ReturnType<PageAgent['aiLocate']>;

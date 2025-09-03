@@ -3,16 +3,13 @@ import * as fs from 'node:fs';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
-import { dirname } from 'node:path';
 import {
   defaultRunDirName,
   getMidsceneRunSubDir,
 } from '@midscene/shared/common';
 import {
   MIDSCENE_DEBUG_MODE,
-  MIDSCENE_OPENAI_INIT_CONFIG_JSON,
-  getAIConfig,
-  getAIConfigInJson,
+  getUploadTestServerUrl,
 } from '@midscene/shared/env';
 import { getRunningPkgInfo } from '@midscene/shared/node';
 import { assert, logMsg } from '@midscene/shared/utils';
@@ -33,7 +30,7 @@ const reportInitializedMap = new Map<string, boolean>();
 declare const __DEV_REPORT_PATH__: string;
 
 function getReportTpl() {
-  if (__DEV_REPORT_PATH__) {
+  if (typeof __DEV_REPORT_PATH__ === 'string' && __DEV_REPORT_PATH__) {
     return fs.readFileSync(__DEV_REPORT_PATH__, 'utf-8');
   }
   const reportTpl = 'REPLACE_ME_WITH_REPORT_HTML';
@@ -139,13 +136,6 @@ export function writeDumpReport(
 ): string | null {
   if (ifInBrowser || ifInWorker) {
     console.log('will not write report in browser');
-    return null;
-  }
-
-  const __dirname = dirname(__filename);
-  const midscenePkgInfo = getRunningPkgInfo(__dirname);
-  if (!midscenePkgInfo) {
-    console.warn('midscenePkgInfo not found, will not write report');
     return null;
   }
 
@@ -290,7 +280,9 @@ export function getVersion() {
 }
 
 function debugLog(...message: any[]) {
-  const debugMode = getAIConfig(MIDSCENE_DEBUG_MODE);
+  // always read from process.env, and cannot be override by modelConfig, overrideAIConfig, etc.
+  // also avoid circular dependency
+  const debugMode = process.env[MIDSCENE_DEBUG_MODE];
   if (debugMode) {
     console.log('[Midscene]', ...message);
   }
@@ -301,8 +293,7 @@ export function uploadTestInfoToServer({ testUrl }: { testUrl: string }) {
   let repoUrl = '';
   let userEmail = '';
 
-  const extraConfig = getAIConfigInJson(MIDSCENE_OPENAI_INIT_CONFIG_JSON);
-  const serverUrl = extraConfig?.REPORT_SERVER_URL;
+  const serverUrl = getUploadTestServerUrl();
 
   try {
     repoUrl = execSync('git config --get remote.origin.url').toString().trim();

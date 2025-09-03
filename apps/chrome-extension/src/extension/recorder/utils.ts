@@ -319,6 +319,9 @@ export const generateRecordTitle = async (
       const response = await callAiFn(
         [prompt[0], prompt[1]],
         AIActionType.EXTRACT_DATA,
+        {
+          intent: 'default',
+        },
       );
       if (response?.content) {
         return {
@@ -624,6 +627,9 @@ const generateAIMindmap = async (
     const response = await callAiFnWithStringResponse(
       prompt,
       AIActionType.EXTRACT_DATA,
+      {
+        intent: 'default',
+      },
     );
 
     if (response?.content && typeof response.content === 'string') {
@@ -807,14 +813,15 @@ export const exportAllEventsToZip = async (sessions: RecordingSession[]) => {
     // Process each session and extract images
     sessionsWithEvents.forEach((session, sessionIndex) => {
       session.events.forEach((event, eventIndex) => {
+        const ext = 'png';
         if (event.screenshotBefore) {
-          const fileName = `screenshot_${sessionIndex}_${eventIndex}_before.png`;
-          const blob = base64ToBlob(event.screenshotBefore, 'image/png');
+          const fileName = `screenshot_${sessionIndex}_${eventIndex}_before.${ext}`;
+          const blob = base64ToBlob(event.screenshotBefore, `image/${ext}`);
           imagesFolder?.file(fileName, blob);
         }
         if (event.screenshotAfter) {
-          const fileName = `screenshot_${sessionIndex}_${eventIndex}_after.png`;
-          const blob = base64ToBlob(event.screenshotAfter, 'image/png');
+          const fileName = `screenshot_${sessionIndex}_${eventIndex}_after.${ext}`;
+          const blob = base64ToBlob(event.screenshotAfter, `image/${ext}`);
           imagesFolder?.file(fileName, blob);
         }
       });

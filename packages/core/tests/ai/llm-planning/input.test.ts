@@ -1,12 +1,27 @@
 import { plan } from '@/ai-model';
-import type { PlanningAction } from '@/types';
+import type { DeviceAction } from '@/types';
+import { globalConfigManager } from '@midscene/shared/env';
 import { getContextFromFixture } from 'tests/evaluation';
-/* eslint-disable max-lines-per-function */
-import { describe, expect, it, vi } from 'vitest';
-
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 vi.setConfig({
   testTimeout: 180 * 1000,
   hookTimeout: 30 * 1000,
+});
+
+const mockActionSpace: DeviceAction[] = [
+  {
+    name: 'Input',
+    description: 'Replace the input field with a new value',
+    paramSchema: z.object({
+      value: z.string(),
+    }),
+    call: () => {},
+  },
+];
+
+beforeAll(async () => {
+  await globalConfigManager.init();
 });
 
 describe('automation - planning input', () => {
@@ -20,7 +35,8 @@ describe('automation - planning input', () => {
     for (const instruction of instructions) {
       const { actions } = await plan(instruction, {
         context,
-        pageType: 'puppeteer',
+        actionSpace: mockActionSpace,
+        interfaceType: 'puppeteer',
       });
       expect(actions).toBeDefined();
       expect(actions?.length).toBeGreaterThan(0);
@@ -38,7 +54,8 @@ describe('automation - planning input', () => {
     for (const instruction of instructions) {
       const { actions } = await plan(instruction, {
         context,
-        pageType: 'puppeteer',
+        actionSpace: mockActionSpace,
+        interfaceType: 'puppeteer',
       });
       expect(actions).toBeDefined();
       expect(actions?.length).toBeGreaterThan(0);

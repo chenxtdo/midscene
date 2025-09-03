@@ -8,11 +8,9 @@ import type {
   Size,
 } from '@midscene/shared/types';
 import type { ChatCompletionMessageParam } from 'openai/resources/index';
-import type {
-  DetailedLocateParam,
-  MidsceneYamlFlowItem,
-  scrollParam,
-} from './yaml';
+import type { z } from 'zod';
+import type { TUserPrompt } from './ai-model/common';
+import type { DetailedLocateParam, MidsceneYamlFlowItem } from './yaml';
 
 export type {
   ElementTreeNode,
@@ -28,6 +26,9 @@ export type AIUsageInfo = Record<string, any> & {
   completion_tokens: number | undefined;
   total_tokens: number | undefined;
   time_cost: number | undefined;
+  model_name: string | undefined;
+  model_description: string | undefined;
+  intent: string | undefined;
 };
 
 /**
@@ -128,6 +129,8 @@ export abstract class UIContext<ElementType extends BaseElement = BaseElement> {
   abstract tree: ElementTreeNode<ElementType>;
 
   abstract size: Size;
+
+  abstract _isFrozen?: boolean;
 }
 
 /**
@@ -150,10 +153,10 @@ export type InsightAction = 'locate' | 'extract' | 'assert' | 'describe';
 export type InsightExtractParam = string | Record<string, string>;
 
 export type LocateResultElement = {
-  id: string;
-  indexId?: number;
   center: [number, number];
   rect: Rect;
+  id: string;
+  indexId?: number;
   xpaths: string[];
   attributes: {
     nodeType: NodeType;
@@ -180,9 +183,6 @@ export interface InsightTaskInfo {
 export interface DumpMeta {
   sdkVersion: string;
   logTime: number;
-  model_name: string;
-  model_description?: string;
-  vitest_it_name?: string;
 }
 
 export interface ReportDumpWithAttributes {
@@ -257,25 +257,7 @@ export interface PlanningLocateParam extends DetailedLocateParam {
 
 export interface PlanningAction<ParamType = any> {
   thought?: string;
-  type:
-    | 'Locate'
-    | 'Tap'
-    | 'RightClick'
-    | 'Hover'
-    | 'Drag'
-    | 'Input'
-    | 'KeyboardPress'
-    | 'Scroll'
-    | 'Error'
-    | 'Assert'
-    | 'AssertWithoutThrow'
-    | 'Sleep'
-    | 'Finished'
-    | 'AndroidBackButton'
-    | 'AndroidHomeButton'
-    | 'AndroidRecentAppsButton'
-    | 'AndroidLongPress'
-    | 'AndroidPull';
+  type: string;
   param: ParamType;
   locate?: PlanningLocateParam | null;
 }
@@ -296,15 +278,10 @@ export interface PlanningAIResponse {
 export type PlanningActionParamTap = null;
 export type PlanningActionParamHover = null;
 export type PlanningActionParamRightClick = null;
+
 export interface PlanningActionParamInputOrKeyPress {
   value: string;
   autoDismissKeyboard?: boolean;
-}
-
-export type PlanningActionParamScroll = scrollParam;
-
-export interface PlanningActionParamAssert {
-  assertion: TUserPrompt;
 }
 
 export interface PlanningActionParamSleep {
@@ -315,19 +292,14 @@ export interface PlanningActionParamError {
   thought: string;
 }
 
-export type PlanningActionParamWaitFor = AgentWaitForOpt & {
-  assertion: string;
-};
+export type PlanningActionParamWaitFor = AgentWaitForOpt & {};
 
-export interface PlanningActionParamAndroidLongPress {
-  x: number;
-  y: number;
+export interface AndroidLongPressParam {
   duration?: number;
 }
 
-export interface PlanningActionParamAndroidPull {
+export interface AndroidPullParam {
   direction: 'up' | 'down';
-  startPoint?: { x: number; y: number };
   distance?: number;
   duration?: number;
 }
@@ -342,7 +314,6 @@ export interface Color {
 
 export interface BaseAgentParserOpt {
   selector?: string;
-  ignoreMarker?: boolean;
 }
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface PuppeteerParserOpt extends BaseAgentParserOpt {}
@@ -387,7 +358,7 @@ export interface ExecutionTaskApply<
   param?: TaskParam;
   thought?: string;
   locate?: PlanningLocateParam | null;
-  pageContext?: UIContext;
+  uiContext?: UIContext;
   executor: (
     param: TaskParam,
     context: ExecutorContext,
@@ -548,10 +519,11 @@ Grouped dump
 export interface GroupedActionDump {
   groupName: string;
   groupDescription?: string;
+  modelBriefs: string[];
   executions: ExecutionDump[];
 }
 
-export type PageType =
+export type InterfaceType =
   | 'puppeteer'
   | 'playwright'
   | 'static'
@@ -593,36 +565,23 @@ export interface StreamingAIResponse {
   isStreamed: boolean;
 }
 
-export type TMultimodalPrompt = {
-  /**
-   * Support use image to inspect elements.
-   * The "images" field is an object that uses image name as key and image url as value.
-   * The image url can be a local path, a http link , or a base64 string.
-   */
-  images?: {
-    name: string;
-    url: string;
-  }[];
-  /**
-   * By default, the image url in the "images" filed starts with `https://` or `http://` will be directly sent to the LLM.
-   * In case the images are not accessible to the LLM (One common case is that image url is internal network only.), you can enable this option.
-   * Then image will be download and convert to base64 format.
-   */
-  convertHttpImage2Base64?: boolean;
-};
-
-export type TUserPrompt =
-  | string
-  | ({
-      prompt: string;
-    } & Partial<TMultimodalPrompt>);
-
-export interface DeviceAction<ParamType = any> {
+export interface DeviceAction<T = any> {
   name: string;
   description?: string;
-  paramSchema?: string;
-  paramDescription?: string;
-  location?: 'required' | 'optional' | false;
-  whatToLocate?: string; // what to locate if location is required or optional
-  call: (param: ParamType) => Promise<void> | void;
+  interfaceAlias?: string;
+  paramSchema?: z.ZodType<T>;
+  call: (param: T, context: ExecutorContext) => Promise<void> | void;
 }
+
+/**
+ * Web-specific types
+ */
+export interface WebElementInfo extends BaseElement {
+  id: string;
+  attributes: {
+    nodeType: NodeType;
+    [key: string]: string;
+  };
+}
+
+export type WebUIContext = UIContext<WebElementInfo>;
