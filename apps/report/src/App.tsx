@@ -9,7 +9,7 @@ import { Logo, Player, globalThemeConfig } from '@midscene/visualizer';
 import DetailPanel from './components/detail-panel';
 import DetailSide from './components/detail-side';
 import GlobalHoverPreview from './components/global-hover-preview';
-import Sidebar from './components/sidebar';
+import Sidebar from './components/sidebar-enhance';
 import { type DumpStoreType, useExecutionDump } from './components/store';
 import Timeline from './components/timeline';
 import type {

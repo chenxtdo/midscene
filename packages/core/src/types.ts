@@ -183,6 +183,7 @@ export interface InsightTaskInfo {
 export interface DumpMeta {
   sdkVersion: string;
   logTime: number;
+  vitest_it_name?: string;
 }
 
 export interface ReportDumpWithAttributes {

@@ -214,6 +214,8 @@ export function writeLogFile(opts: {
     writeFileSync(filePath, fileContent);
   }
 
+  writeFileSync(filePath, fileContent);
+
   if (opts?.generateReport) {
     return writeDumpReport(fileName, fileContent, opts.appendReport);
   }

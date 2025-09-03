@@ -7,6 +7,8 @@ export default defineConfig({
     testTimeout: 100000,
     hookTimeout: 100000,
     globals: true,
+    globalSetup: ['./src/global-setup.ts'],
+    globalTeardown: ['./src/global-setup.ts']
   },
   optimizeDeps: {
     include: ['@silvia-odwyer/photon']

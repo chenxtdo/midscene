@@ -3,7 +3,7 @@ import { PlaywrightAgent } from '@midscene/web/playwright';
 
 import 'dotenv/config';
 
-
+// 获取文件名称
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe('测试启动', async () => {
@@ -27,11 +27,11 @@ describe('测试启动', async () => {
     await sleep(5000); // 👀 init Midscene agent
 
     agent1 = new PlaywrightAgent(page, {
-      groupName: 'index1-agent1',
+      groupName: 'index2-agent1',
       generateReport: false
     });
     agent2 = new PlaywrightAgent(page, {
-      groupName: 'index1-agent2',
+      groupName: 'index2-agent2',
       generateReport: false
     });
   });

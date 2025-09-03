@@ -203,6 +203,8 @@ export class Executor {
       logTime: Date.now(),
       name: this.name,
       tasks: this.tasks,
+      // @ts-ignore
+      vitest_it_name: globalThis.vitest_it_name,
     };
     return dumpData;
   }

@@ -9,6 +9,7 @@ declare global {
 
   var vitest_describe_name: string;
   var vitest_it_name: string;
+  var __TEST_START_TIME__: number;
 }
 
 export {};
